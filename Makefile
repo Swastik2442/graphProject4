@@ -1,31 +1,8 @@
-#**************************************************************************************************
-#
-#   raylib makefile for Desktop platforms, Raspberry Pi, Android and HTML5
-#
-#   Copyright (c) 2013-2019 Ramon Santamaria (@raysan5)
-#
-#   This software is provided "as-is", without any express or implied warranty. In no event
-#   will the authors be held liable for any damages arising from the use of this software.
-#
-#   Permission is granted to anyone to use this software for any purpose, including commercial
-#   applications, and to alter it and redistribute it freely, subject to the following restrictions:
-#
-#     1. The origin of this software must not be misrepresented; you must not claim that you
-#     wrote the original software. If you use this software in a product, an acknowledgment
-#     in the product documentation would be appreciated but is not required.
-#
-#     2. Altered source versions must be plainly marked as such, and must not be misrepresented
-#     as being the original software.
-#
-#     3. This notice may not be removed or altered from any source distribution.
-#
-#**************************************************************************************************
-
 .PHONY: all clean
 
 # Define required raylib variables
-PROJECT_NAME       ?= game
-RAYLIB_VERSION     ?= 4.2.0
+PROJECT_NAME       ?= graphProject4
+RAYLIB_VERSION     ?= 5.0
 RAYLIB_PATH        ?= ..\..
 
 # Define compiler path on Windows
@@ -92,12 +69,6 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
         endif
     endif
 endif
-ifeq ($(PLATFORM),PLATFORM_RPI)
-    UNAMEOS=$(shell uname)
-    ifeq ($(UNAMEOS),Linux)
-        PLATFORM_OS=LINUX
-    endif
-endif
 
 # RAYLIB_PATH adjustment for different platforms.
 # If using GNU make, we can get the full path to the top of the tree. Windows? BSD?
@@ -107,22 +78,6 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
         RAYLIB_PREFIX ?= ..
         RAYLIB_PATH    = $(realpath $(RAYLIB_PREFIX))
     endif
-endif
-# Default path for raylib on Raspberry Pi, if installed in different path, update it!
-# This is not currently used by src/Makefile. Not sure of its origin or usage. Refer to wiki.
-# TODO: update install: target in src/Makefile for RPI, consider relation to LINUX.
-ifeq ($(PLATFORM),PLATFORM_RPI)
-    RAYLIB_PATH       ?= /home/pi/raylib
-endif
-
-ifeq ($(PLATFORM),PLATFORM_WEB)
-    # Emscripten required variables
-    EMSDK_PATH         ?= C:/emsdk
-    EMSCRIPTEN_PATH    ?= $(EMSDK_PATH)/upstream/emscripten
-    CLANG_PATH          = $(EMSDK_PATH)/upstream/bin
-    PYTHON_PATH         = $(EMSDK_PATH)/python/3.9.2-1_64bit
-    NODE_PATH           = $(EMSDK_PATH)/node/14.18.2_64bit/bin
-    export PATH         = $(EMSDK_PATH);$(EMSCRIPTEN_PATH);$(CLANG_PATH);$(NODE_PATH);$(PYTHON_PATH):$$(PATH)
 endif
 
 # Define raylib release directory for compiled library.
@@ -157,19 +112,6 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
         CC = clang
     endif
 endif
-ifeq ($(PLATFORM),PLATFORM_RPI)
-    ifeq ($(USE_RPI_CROSS_COMPILER),TRUE)
-        # Define RPI cross-compiler
-        #CC = armv6j-hardfloat-linux-gnueabi-gcc
-        CC = $(RPI_TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
-    endif
-endif
-ifeq ($(PLATFORM),PLATFORM_WEB)
-    # HTML5 emscripten compiler
-    # WARNING: To compile to HTML5, code must be redesigned
-    # to use emscripten.h and emscripten_set_main_loop()
-    CC = emcc
-endif
 
 # Define default make program: Mingw32-make
 MAKE = mingw32-make
@@ -201,13 +143,16 @@ else
     CFLAGS += -s -O1
 endif
 
+# Resource file to link (if required)
+RC_FILE_NAME = graphProject4.rc.data
+
 # Additional flags for compiler (if desired)
-#CFLAGS += -Wextra -Wmissing-prototypes -Wstrict-prototypes
+CFLAGS += -Wextra -Wmissing-prototypes -Wstrict-prototypes
 ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     ifeq ($(PLATFORM_OS),WINDOWS)
         # resource file contains windows executable icon and properties
         # -Wl,--subsystem,windows hides the console window
-        CFLAGS += $(RAYLIB_PATH)/src/raylib.rc.data -Wl,--subsystem,windows
+        CFLAGS += src/$(RC_FILE_NAME) -Wl,--subsystem,windows
     endif
     ifeq ($(PLATFORM_OS),LINUX)
         ifeq ($(RAYLIB_LIBTYPE),STATIC)
@@ -219,45 +164,12 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
         endif
     endif
 endif
-ifeq ($(PLATFORM),PLATFORM_RPI)
-    CFLAGS += -std=gnu99
-endif
-ifeq ($(PLATFORM),PLATFORM_WEB)
-    # -Os                        # size optimization
-    # -O2                        # optimization level 2, if used, also set --memory-init-file 0
-    # -s USE_GLFW=3              # Use glfw3 library (context/input management)
-    # -s ALLOW_MEMORY_GROWTH=1   # to allow memory resizing -> WARNING: Audio buffers could FAIL!
-    # -s TOTAL_MEMORY=16777216   # to specify heap memory size (default = 16MB)
-    # -s USE_PTHREADS=1          # multithreading support
-    # -s WASM=0                  # disable Web Assembly, emitted by default
-    # -s EMTERPRETIFY=1          # enable emscripten code interpreter (very slow)
-    # -s EMTERPRETIFY_ASYNC=1    # support synchronous loops by emterpreter
-    # -s FORCE_FILESYSTEM=1      # force filesystem to load/save files data
-    # -s ASSERTIONS=1            # enable runtime checks for common memory allocation errors (-O1 and above turn it off)
-    # --profiling                # include information for code profiling
-    # --memory-init-file 0       # to avoid an external memory initialization code file (.mem)
-    # --preload-file resources   # specify a resources folder for data compilation
-    CFLAGS += -Os -s USE_GLFW=3 -s TOTAL_MEMORY=16777216 --preload-file resources
-    ifeq ($(BUILD_MODE), DEBUG)
-        CFLAGS += -s ASSERTIONS=1 --profiling
-    endif
 
-    # Define a custom shell .html and output extension
-    CFLAGS += --shell-file $(RAYLIB_PATH)/src/shell.html
-    EXT = .html
-endif
 
 # Define include paths for required headers
 # NOTE: Several external required libraries (stb and others)
 INCLUDE_PATHS = -I. -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external
 
-# Define additional directories containing required header files
-ifeq ($(PLATFORM),PLATFORM_RPI)
-    # RPI required libraries
-    INCLUDE_PATHS += -I/opt/vc/include
-    INCLUDE_PATHS += -I/opt/vc/include/interface/vmcs_host/linux
-    INCLUDE_PATHS += -I/opt/vc/include/interface/vcos/pthreads
-endif
 ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     ifeq ($(PLATFORM_OS),BSD)
         # Consider -L$(RAYLIB_H_INSTALL_PATH)
@@ -283,10 +195,6 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
         # Precedence: immediately local, installed version, raysan5 provided libs
         LDFLAGS = -L. -L$(RAYLIB_INSTALL_PATH) -L$(RAYLIB_RELEASE_PATH)
     endif
-endif
-
-ifeq ($(PLATFORM),PLATFORM_RPI)
-    LDFLAGS += -L/opt/vc/lib
 endif
 
 # Define any libraries required on linking
@@ -334,15 +242,6 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
         LDLIBS += -lglfw
     endif
 endif
-ifeq ($(PLATFORM),PLATFORM_RPI)
-    # Libraries for Raspberry Pi compiling
-    # NOTE: Required packages: libasound2-dev (ALSA)
-    LDLIBS = -lraylib -lbrcmGLESv2 -lbrcmEGL -lpthread -lrt -lm -lbcm_host -ldl
-endif
-ifeq ($(PLATFORM),PLATFORM_WEB)
-    # Libraries for web (HTML5) compiling
-    LDLIBS = $(RAYLIB_RELEASE_PATH)/libraylib.a
-endif
 
 # Define a recursive wildcard function
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
@@ -352,23 +251,22 @@ SRC_DIR = src
 OBJ_DIR = obj
 
 # Define all object files from source files
-SRC = $(call rwildcard, *.c, *.h)
-#OBJS = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+# SRC = $(call rwildcard, *.c, *.h)
+SRC = $(shell find $(SRC_DIR) -name '*.[ch]')
+OBJS = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 OBJS ?= main.c
 
-# For Android platform we call a custom Makefile.Android
-ifeq ($(PLATFORM),PLATFORM_ANDROID)
-    MAKEFILE_PARAMS = -f Makefile.Android
-    export PROJECT_NAME
-    export SRC_DIR
-else
-    MAKEFILE_PARAMS = $(PROJECT_NAME)
-endif
+# Define the locations for the source files
+VPATH = $(SRC_DIR)
+
+# Define the Makefile parameters
+MAKEFILE_PARAMS = $(PROJECT_NAME)
 
 # Default target entry
 # NOTE: We call this Makefile target or Makefile.Android target
 all:
 	$(MAKE) $(MAKEFILE_PARAMS)
+    # $(info var is "$(SRC)")
 
 # Project target defined by PROJECT_NAME
 $(PROJECT_NAME): $(OBJS)
@@ -394,12 +292,3 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
 		rm -f *.o
     endif
 endif
-ifeq ($(PLATFORM),PLATFORM_RPI)
-	find . -type f -executable -delete
-	rm -fv *.o
-endif
-ifeq ($(PLATFORM),PLATFORM_WEB)
-	del *.o *.html *.js
-endif
-	@echo Cleaning done
-
