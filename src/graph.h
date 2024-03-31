@@ -1,24 +1,22 @@
 #ifndef _GRAPH_H_
 #define _GRAPH_H_
 
+#define MAX_VERTICES 64
+
 typedef struct graph_t {
     int n;
-    int **adj;
+    char *labels[MAX_VERTICES];
+    int adj[MAX_VERTICES][MAX_VERTICES];
 } Graph;
 
-// Initialize a Graph with n vertices
-void graphInit(Graph *g, int n);
-
-// Deinitialize a Graph
+void graphInit(Graph *g, int n, char *labels[n]);
 void graphDeinit(Graph *g);
-
-// Add an Edge between two Vertices
-void addEdge(Graph *g, int u, int v);
-
-// Remove an Edge between two Vertices
-void removeEdge(Graph *g, int u, int v);
-
-// Check if there is an Edge between two Vertices
-int hasEdge(Graph *g, int u, int v);
+int addVertex(Graph *g, char *label);
+int editVertex(Graph *g, char *label, char *newLabel);
+int removeVertex(Graph *g, char *label);
+int addEdge(Graph *g, char *labelU, char *labelV);
+int editEdge(Graph *g, char *labelU, char *labelV, int weight);
+int removeEdge(Graph *g, char *labelU, char *labelV);
+int editGraph(Graph *g, int n, char *labels[n], int newAdj[n][n]);
 
 #endif

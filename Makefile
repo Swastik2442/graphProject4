@@ -165,10 +165,9 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     endif
 endif
 
-
 # Define include paths for required headers
 # NOTE: Several external required libraries (stb and others)
-INCLUDE_PATHS = -I. -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external
+INCLUDE_PATHS = -I/src -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external
 
 ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     ifeq ($(PLATFORM_OS),BSD)
@@ -254,10 +253,6 @@ OBJ_DIR = obj
 # SRC = $(call rwildcard, *.c, *.h)
 SRC = $(shell find $(SRC_DIR) -name '*.[ch]')
 OBJS = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
-OBJS ?= main.c
-
-# Define the locations for the source files
-VPATH = $(SRC_DIR)
 
 # Define the Makefile parameters
 MAKEFILE_PARAMS = $(PROJECT_NAME)
@@ -266,7 +261,6 @@ MAKEFILE_PARAMS = $(PROJECT_NAME)
 # NOTE: We call this Makefile target or Makefile.Android target
 all:
 	$(MAKE) $(MAKEFILE_PARAMS)
-    # $(info var is "$(SRC)")
 
 # Project target defined by PROJECT_NAME
 $(PROJECT_NAME): $(OBJS)
