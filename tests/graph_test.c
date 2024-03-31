@@ -37,12 +37,6 @@ int test1()
     assert(strcmp(g.labels[7], "H1") == 0);
     assert(strcmp(g.labels[8], "I1") == 0);
 
-    removeVertex(&g, "G1");
-    removeVertex(&g, "H1");
-    removeVertex(&g, "I1");
-
-    assert(g.n == 6);
-
     graphDeinit(&g);
 
     assert(g.n == 0);

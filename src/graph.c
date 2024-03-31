@@ -24,6 +24,10 @@ void graphInit(Graph *g, int n, char *labels[n])
         for (int i = 0; i < g->n; i++)
             g->labels[i] = strdup(labels[i]);
     }
+
+    for (int i = 0; i < MAX_VERTICES; i++)
+        for (int j = 0; j < MAX_VERTICES; j++)
+            g->adj[i][j] = 0;
 }
 
 // Deinitialize a Graph
@@ -53,21 +57,6 @@ int editVertex(Graph *g, char *label, char *newLabel)
         {
             free(g->labels[i]);
             g->labels[i] = strdup(newLabel);
-            return 0;
-        }
-    return -1;
-}
-
-// Remove a Vertex from the Graph
-int removeVertex(Graph *g, char *label)
-{
-    for (int i = 0; i < g->n; i++)
-        if (strcmp(g->labels[i], label) == 0)
-        {
-            free(g->labels[i]);
-            for (int j = i; j < g->n - 1; j++)
-                g->labels[j] = g->labels[j + 1];
-            g->n--;
             return 0;
         }
     return -1;

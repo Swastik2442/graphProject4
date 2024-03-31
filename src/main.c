@@ -8,6 +8,7 @@
 #include "raygui.h"
 
 #include "graph.h"
+#include "csv.h"
 
 #define MAX_POINTS 64
 
@@ -26,7 +27,7 @@ typedef enum {
 //------------------------------------------------------------------------------------
 // All the Scenes
 void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow);
-void mainScene(Vector2 *points, int pointCount, int focusedPoint, char *csvFilePath,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint, char *csvFilePath,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive);
 //------------------------------------------------------------------------------------
 
@@ -47,21 +48,28 @@ int main(void)
     bool debugInfoActive = false;
 
     // Points Configuration
-    int n = 6, x = halfScreenWidth, y = halfScreenHeight, r = 200;
-    Vector2 points[MAX_POINTS];
-    for (int i = 0; i < n; i++)
-        points[i] = (Vector2){x + r * cos(2 * PI * i / n), y + r * sin(2 * PI * i / n)};
-
     int pointCount = 6;
     int selectedPoint = -1;
     int focusedPoint = -1;
+    int graphRadius = 200;
 
+    Vector2 points[MAX_POINTS];
+    for (int i = 0; i < pointCount; i++)
+        points[i] = (Vector2){halfScreenWidth + graphRadius * cos(2 * PI * i / pointCount), halfScreenHeight + graphRadius * sin(2 * PI * i / pointCount)};
 
     // Graph Configuration
+    Graph theGraph;
+    char *labels[] = {"A", "B", "C", "D", "E", "F"};
+    graphInit(&theGraph, 6, labels);
+    addEdge(&theGraph, "A", "B");
+    addEdge(&theGraph, "B", "C");
+    addEdge(&theGraph, "C", "D");
+    addEdge(&theGraph, "D", "E");
+    addEdge(&theGraph, "E", "F");
+    addEdge(&theGraph, "F", "A");
+
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
     TextCopy(csvFilePath, "Drop a CSV File Here");
-    // Graph g;
-    // graphInit(&g, n);
 
     // Edge Config Variables
     float edgeThickness = 8.0f;
@@ -101,8 +109,11 @@ int main(void)
                     // Point Creation Logic
                     if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && (pointCount < MAX_POINTS) && (focusedPoint == -1) && (!adjacencyMatrixWindowActive))
                     {
-                        points[pointCount] = GetMousePosition();
-                        pointCount++;
+                        if (addVertex(&theGraph, (char *)TextFormat("%c", 65 + pointCount)) == 0)
+                        {
+                            points[pointCount] = GetMousePosition();
+                            pointCount++;
+                        }
                     }
 
                     // Point Focus and Selection Logic
@@ -130,7 +141,9 @@ int main(void)
                         FilePathList droppedFiles = LoadDroppedFiles();
 
                         if ((droppedFiles.count > 0) && IsFileExtension(droppedFiles.paths[0], ".csv"))
+                        {
                             TextCopy(csvFilePath, droppedFiles.paths[0]);
+                        }
 
                         UnloadDroppedFiles(droppedFiles);
                     }
@@ -156,7 +169,7 @@ int main(void)
                 }
                 case MAIN_SCENE:
                 {
-                    mainScene(points, pointCount, focusedPoint, csvFilePath, &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive);
+                    mainScene(points, &theGraph, pointCount, focusedPoint, csvFilePath, &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive);
                     break;
                 }
                 default:
@@ -169,6 +182,10 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
+    graphDeinit(&theGraph);
+
+    RL_FREE(csvFilePath);
+
     CloseWindow();        // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
@@ -198,25 +215,43 @@ void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow)
 
 // Draw Main Scene
 //----------------------------------------------------------------------------------
-void mainScene(Vector2 *points, int pointCount, int focusedPoint, char *csvFilePath,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint, char *csvFilePath,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive)
 {
-    // Draw Debug Information
-    if (*debugInfoActive)
-    {
-        DrawFPS(screenWidth - 80, 10);
-
-        DrawLineEx(points[0], points[pointCount - 1], *edgeThickness, SKYBLUE);
-        
-        for (int i = 0; i < pointCount; i++)
+    
+    // Draw Edges
+    for (int i = 0; i < pointCount; i++) {
+        for (int j = 0; j < pointCount; j++)
         {
-            DrawText(TextFormat("(%.2f, %.2f)", points[i].x, points[i].y), points[i].x + 20, points[i].y + 20, 10, BLACK);
-            if (i < pointCount - 1) DrawLineEx(points[i], points[i + 1], *edgeThickness, SKYBLUE);
+            if ((*theGraph).adj[i][j] >= 1)
+            {
+                // Draw Edge
+                DrawLineEx(points[i], points[j], *edgeThickness, SKYBLUE);
+
+                // Draw Arrow // TODO: Refactor this into a Better Function
+                Vector2 distPoint = {points[j].x - points[i].x, points[j].y - points[i].y};
+                float angle = atan2f(distPoint.y, distPoint.x);
+                Vector2 arrowEndPoint = {points[j].x - (22)*cosf(angle), points[j].y - (22)*sinf(angle)};
+                Vector2 arrowBasePoint = {arrowEndPoint.x - (22)*cosf(angle), arrowEndPoint.y - (22)*sinf(angle)};
+                float side1 = arrowEndPoint.x - points[i].x;
+                float side2 = arrowEndPoint.y - points[i].y;
+                Vector2 endPoint1 = {arrowBasePoint.x - side2 / 24, arrowBasePoint.y + side1 / 24};
+                Vector2 endPoint2 = {arrowBasePoint.x + side2 / 24, arrowBasePoint.y - side1 / 24};
+                DrawTriangle(endPoint2, endPoint1, arrowEndPoint, SKYBLUE);
+
+                // Draw Edge Weights
+                Vector2 midPoint = {(points[i].x + points[j].x) / 2, (points[i].y + points[j].y) / 2};
+                DrawText(TextFormat("%d", (*theGraph).adj[i][j]), midPoint.x, midPoint.y + 20, 10, BLACK);
+            }
         }
     }
 
+    // Draw Vertices and Labels
     for (int i = 0; i < pointCount; i++)
+    {
         DrawCircleV(points[i], (focusedPoint == i)? 30.0f : 24.0f, (focusedPoint == i)? GRAY: LIGHTGRAY);
+        DrawText(TextFormat("%s", (*theGraph).labels[i]), points[i].x - 5, points[i].y - 5, 15, BLACK);
+    }
 
     // Draw Configs
     if (GuiButton((Rectangle){12, 12, 200, 24}, "Show Adjacency Matrix"))
@@ -224,6 +259,15 @@ void mainScene(Vector2 *points, int pointCount, int focusedPoint, char *csvFileP
     GuiLabel((Rectangle){ 12, 62, 140, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
     GuiSliderBar((Rectangle){ 12, 84, 140, 16 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
     DrawText(csvFilePath, 12, 110, 12, GRAY);
+
+    // Draw Debug Information
+    if (*debugInfoActive)
+    {
+        DrawFPS(screenWidth - 80, 10);
+
+        for (int i = 0; i < pointCount; i++)
+            DrawText(TextFormat("(%.2f, %.2f)", points[i].x, points[i].y), points[i].x + 20, points[i].y + 20, 10, BLACK);
+    }
 
     // Draw Adjacency Matrix Window
     if (*adjacencyMatrixWindowActive)

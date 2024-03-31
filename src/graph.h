@@ -13,7 +13,6 @@ void graphInit(Graph *g, int n, char *labels[n]);
 void graphDeinit(Graph *g);
 int addVertex(Graph *g, char *label);
 int editVertex(Graph *g, char *label, char *newLabel);
-int removeVertex(Graph *g, char *label);
 int addEdge(Graph *g, char *labelU, char *labelV);
 int editEdge(Graph *g, char *labelU, char *labelV, int weight);
 int removeEdge(Graph *g, char *labelU, char *labelV);
