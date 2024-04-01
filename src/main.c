@@ -27,8 +27,13 @@ typedef enum {
 //------------------------------------------------------------------------------------
 // All the Scenes
 void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow);
-void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint, char *csvFilePath,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive);
+//------------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------------
+// Utility Functions
+void createPointPolygon(Vector2 *points, int pointCount, int radius);
 //------------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------------
@@ -54,19 +59,20 @@ int main(void)
     int graphRadius = 200;
 
     Vector2 points[MAX_POINTS];
-    for (int i = 0; i < pointCount; i++)
-        points[i] = (Vector2){halfScreenWidth + graphRadius * cos(2 * PI * i / pointCount), halfScreenHeight + graphRadius * sin(2 * PI * i / pointCount)};
+    createPointPolygon(points, pointCount, graphRadius);
 
     // Graph Configuration
     Graph theGraph;
-    char *labels[] = {"A", "B", "C", "D", "E", "F"};
-    graphInit(&theGraph, 6, labels);
-    addEdge(&theGraph, "A", "B");
-    addEdge(&theGraph, "B", "C");
-    addEdge(&theGraph, "C", "D");
-    addEdge(&theGraph, "D", "E");
-    addEdge(&theGraph, "E", "F");
-    addEdge(&theGraph, "F", "A");
+    {
+        char *labels[] = {"A", "B", "C", "D", "E", "F"};
+        graphInit(&theGraph, 6, labels);
+        addEdge(&theGraph, "A", "B");
+        addEdge(&theGraph, "B", "C");
+        addEdge(&theGraph, "C", "D");
+        addEdge(&theGraph, "D", "E");
+        addEdge(&theGraph, "E", "F");
+        addEdge(&theGraph, "F", "A");
+    }
 
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
     TextCopy(csvFilePath, "Drop a CSV File Here");
@@ -74,6 +80,7 @@ int main(void)
     // Edge Config Variables
     float edgeThickness = 8.0f;
 
+    // Windows Configuration
     bool adjacencyMatrixWindowActive = false;
 
     // Set custom GUI Style
@@ -143,6 +150,20 @@ int main(void)
                         if ((droppedFiles.count > 0) && IsFileExtension(droppedFiles.paths[0], ".csv"))
                         {
                             TextCopy(csvFilePath, droppedFiles.paths[0]);
+                            char *csvData[MAX_CSV_ROWS][MAX_CSV_COLS];
+                            int csvRows, csvCols, csvN;
+                            readCSV(csvFilePath, csvData, &csvRows, &csvCols);
+                            csvN = (csvRows <= csvCols) ? csvRows : csvCols;
+                            int adj[csvN][csvN];
+                            for (int i = 1; i < csvN; i++)
+                            {
+                                for (int j = 1; j < csvN; j++)
+                                    adj[i-1][j-1] = strtol(csvData[i][j], NULL, 10);
+                            }
+                            pointCount = csvN-1;
+                            editGraph(&theGraph, pointCount, csvData[0]+1, adj);
+                            createPointPolygon(points, pointCount, graphRadius);
+                            // ErrorMessage(TEXT("An Error Occured while reading the CSV"));
                         }
 
                         UnloadDroppedFiles(droppedFiles);
@@ -169,7 +190,7 @@ int main(void)
                 }
                 case MAIN_SCENE:
                 {
-                    mainScene(points, &theGraph, pointCount, focusedPoint, csvFilePath, &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive);
+                    mainScene(points, &theGraph, pointCount, focusedPoint, &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive);
                     break;
                 }
                 default:
@@ -215,7 +236,7 @@ void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow)
 
 // Draw Main Scene
 //----------------------------------------------------------------------------------
-void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint, char *csvFilePath,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive)
 {
     
@@ -256,9 +277,8 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoin
     // Draw Configs
     if (GuiButton((Rectangle){12, 12, 200, 24}, "Show Adjacency Matrix"))
         *adjacencyMatrixWindowActive = !(*adjacencyMatrixWindowActive);
-    GuiLabel((Rectangle){ 12, 62, 140, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
-    GuiSliderBar((Rectangle){ 12, 84, 140, 16 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
-    DrawText(csvFilePath, 12, 110, 12, GRAY);
+    GuiLabel((Rectangle){ 12, 42, 140, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
+    GuiSliderBar((Rectangle){ 12, 64, 140, 16 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
 
     // Draw Debug Information
     if (*debugInfoActive)
@@ -272,7 +292,31 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoin
     // Draw Adjacency Matrix Window
     if (*adjacencyMatrixWindowActive)
     {
-        *adjacencyMatrixWindowActive = !GuiWindowBox((Rectangle){screenWidth - 312, 12, 300, 300}, "Adjacency Matrix");
+        int windowSize = 48 * (pointCount < 4 ? 6 : pointCount + 2);
+        int windowX = screenWidth - windowSize - 12;
+        int windowY = 12;
+        *adjacencyMatrixWindowActive = !GuiWindowBox((Rectangle){windowX, windowY, windowSize - 16, windowSize}, "Adjacency Matrix");
+        for (int i = 0; i < pointCount; i++)
+        {
+            for (int j = 0; j < pointCount; j++)
+            {
+                char *edgeWeight = (char *)TextFormat("%d", (*theGraph).adj[i][j]);
+                GuiTextBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, edgeWeight, 5, false);
+            }
+            GuiLabel((Rectangle){windowX + 16, 72 + 50 * i, 40, 40}, (*theGraph).labels[i]);
+            GuiLabel((Rectangle){windowX + 50 + 50 * i, 36, 40, 40}, (*theGraph).labels[i]);
+        }
     }
+}
+//----------------------------------------------------------------------------------
+
+
+// Create a Polygon of Points
+//----------------------------------------------------------------------------------
+void createPointPolygon(Vector2 *points, int pointCount, int radius)
+{
+    int arrSize = (pointCount <= MAX_POINTS) ? pointCount : MAX_POINTS;
+    for (int i = 0; i < arrSize; i++)
+        points[i] = (Vector2){halfScreenWidth + radius * cos(2 * PI * i / arrSize), halfScreenHeight + radius * sin(2 * PI * i / arrSize)};
 }
 //----------------------------------------------------------------------------------
