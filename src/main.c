@@ -18,6 +18,9 @@ const int screenHeight = 720;
 const int halfScreenWidth = screenWidth / 2;
 const int halfScreenHeight = screenHeight / 2;
 
+// Constants
+const int graphRadius = 200;
+
 // Scene Types
 typedef enum {
     START_MENU = 0,      // Start Menu
@@ -27,7 +30,7 @@ typedef enum {
 //------------------------------------------------------------------------------------
 // All the Scenes
 void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow);
-void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive);
 //------------------------------------------------------------------------------------
 
@@ -56,7 +59,6 @@ int main(void)
     int pointCount = 6;
     int selectedPoint = -1;
     int focusedPoint = -1;
-    int graphRadius = 200;
 
     Vector2 points[MAX_POINTS];
     createPointPolygon(points, pointCount, graphRadius);
@@ -78,7 +80,7 @@ int main(void)
     TextCopy(csvFilePath, "Drop a CSV File Here");
 
     // Edge Config Variables
-    float edgeThickness = 8.0f;
+    float edgeThickness = 4.0f;
 
     // Windows Configuration
     bool adjacencyMatrixWindowActive = false;
@@ -149,6 +151,7 @@ int main(void)
 
                         if ((droppedFiles.count > 0) && IsFileExtension(droppedFiles.paths[0], ".csv"))
                         {
+                            // TODO - Refactor this into a Thread
                             TextCopy(csvFilePath, droppedFiles.paths[0]);
                             char *csvData[MAX_CSV_ROWS][MAX_CSV_COLS];
                             int csvRows, csvCols, csvN;
@@ -163,7 +166,6 @@ int main(void)
                             pointCount = csvN-1;
                             editGraph(&theGraph, pointCount, csvData[0]+1, adj);
                             createPointPolygon(points, pointCount, graphRadius);
-                            // ErrorMessage(TEXT("An Error Occured while reading the CSV"));
                         }
 
                         UnloadDroppedFiles(droppedFiles);
@@ -190,7 +192,7 @@ int main(void)
                 }
                 case MAIN_SCENE:
                 {
-                    mainScene(points, &theGraph, pointCount, focusedPoint, &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive);
+                    mainScene(points, &theGraph, pointCount, &focusedPoint, &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive);
                     break;
                 }
                 default:
@@ -236,7 +238,7 @@ void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow)
 
 // Draw Main Scene
 //----------------------------------------------------------------------------------
-void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoint,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive)
 {
     
@@ -270,24 +272,17 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoin
     // Draw Vertices and Labels
     for (int i = 0; i < pointCount; i++)
     {
-        DrawCircleV(points[i], (focusedPoint == i)? 30.0f : 24.0f, (focusedPoint == i)? GRAY: LIGHTGRAY);
+        DrawCircleV(points[i], (*focusedPoint == i)? 30.0f : 24.0f, (*focusedPoint == i)? GRAY: LIGHTGRAY);
         DrawText(TextFormat("%s", (*theGraph).labels[i]), points[i].x - 5, points[i].y - 5, 15, BLACK);
     }
 
     // Draw Configs
-    if (GuiButton((Rectangle){12, 12, 200, 24}, "Show Adjacency Matrix"))
+    if (GuiButton((Rectangle){12, 12, 24, 24}, "#185#"))
+        createPointPolygon(points, pointCount, graphRadius);
+    if (GuiButton((Rectangle){48, 12, 200, 24}, "Show Adjacency Matrix"))
         *adjacencyMatrixWindowActive = !(*adjacencyMatrixWindowActive);
-    GuiLabel((Rectangle){ 12, 42, 140, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
-    GuiSliderBar((Rectangle){ 12, 64, 140, 16 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
-
-    // Draw Debug Information
-    if (*debugInfoActive)
-    {
-        DrawFPS(screenWidth - 80, 10);
-
-        for (int i = 0; i < pointCount; i++)
-            DrawText(TextFormat("(%.2f, %.2f)", points[i].x, points[i].y), points[i].x + 20, points[i].y + 20, 10, BLACK);
-    }
+    GuiLabel((Rectangle){ 12, 48, 160, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
+    GuiSliderBar((Rectangle){ 12, 72, 140, 24 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
 
     // Draw Adjacency Matrix Window
     if (*adjacencyMatrixWindowActive)
@@ -300,12 +295,30 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int focusedPoin
         {
             for (int j = 0; j < pointCount; j++)
             {
-                char *edgeWeight = (char *)TextFormat("%d", (*theGraph).adj[i][j]);
-                GuiTextBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, edgeWeight, 5, false);
+                if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}))
+                {
+                    GuiValueBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, "", &(*theGraph).adj[i][j], 0, INT_MAX, true);
+                    *focusedPoint = i; // Why does this not work?
+                }
+                else
+                {
+                    GuiValueBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, "", &(*theGraph).adj[i][j], 0, INT_MAX, false);
+                    *focusedPoint = -1;
+                }
             }
             GuiLabel((Rectangle){windowX + 16, 72 + 50 * i, 40, 40}, (*theGraph).labels[i]);
-            GuiLabel((Rectangle){windowX + 50 + 50 * i, 36, 40, 40}, (*theGraph).labels[i]);
+            GuiLabel((Rectangle){windowX + 56 + 50 * i, 36, 40, 40}, (*theGraph).labels[i]);
         }
+    }
+
+    // Draw Debug Information
+    if (*debugInfoActive)
+    {
+        DrawFPS(screenWidth - 80, 10);
+        GuiLabel((Rectangle){ 12, screenHeight - 36, 160, 24 }, TextFormat("Focused Point: %i", (int)*focusedPoint));
+
+        for (int i = 0; i < pointCount; i++)
+            DrawText(TextFormat("(%.2f, %.2f)", points[i].x, points[i].y), points[i].x + 20, points[i].y + 20, 10, BLACK);
     }
 }
 //----------------------------------------------------------------------------------
