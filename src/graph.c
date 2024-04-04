@@ -110,3 +110,66 @@ int editGraph(Graph *g, int n, char *labels[n], int newAdj[n][n])
 
     return 0;
 }
+
+// Breadth-First Search
+void breadthFirstSearch(Graph *g, char *label)
+{
+    int visited[MAX_VERTICES] = {0};
+
+    for (int i = 0; i < g->n; i++)
+        if (strcmp(g->labels[i], label) == 0)
+            bfs(g, i, visited);
+}
+
+// Helper Function for Breadth-First Search
+void bfs(Graph *g, int u, int visited[])
+{
+    int queue[MAX_VERTICES];
+    int front = 0, rear = 0;
+
+    visited[u] = 1;
+    printf("%s ", g->labels[u]);
+    queue[rear++] = u;
+
+    while (front < rear) {
+        u = queue[front++];
+
+        for (int v = 0; v < g->n; v++)
+            if (g->adj[u][v] && !visited[v]) {
+                visited[v] = 1;
+                printf("%s ", g->labels[v]);
+                queue[rear++] = v;
+            }
+    }
+}
+
+// Depth-First Search
+void depthFirstSearch(Graph *g, char *label)
+{
+    int visited[MAX_VERTICES] = {0};
+
+    for (int i = 0; i < g->n; i++)
+        if (strcmp(g->labels[i], label) == 0)
+            dfs(g, i, visited);
+}
+
+// Helper Function for Depth-First Search
+void dfs(Graph *g, int u, int visited[])
+{
+    int stack[MAX_VERTICES];
+    int top = 0;
+
+    visited[u] = 1;
+    stack[top++] = u;
+
+    while (top > 0) {
+        u = stack[--top];
+        printf("%s ", g->labels[u]);
+
+        for (int v = 0; v < g->n; v++)
+            if (g->adj[u][v] && !visited[v]) {
+                visited[v] = 1;
+                stack[top++] = v;
+            }
+    }
+}

@@ -30,7 +30,7 @@ typedef enum {
 //------------------------------------------------------------------------------------
 // All the Scenes
 void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow);
-void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint, SceneType *currentScene,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive);
 //------------------------------------------------------------------------------------
 
@@ -192,7 +192,10 @@ int main(void)
                 }
                 case MAIN_SCENE:
                 {
-                    mainScene(points, &theGraph, pointCount, &focusedPoint, &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive);
+                    mainScene(
+                        points, &theGraph, pointCount, &focusedPoint, &currentScene,
+                        &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive
+                    );
                     break;
                 }
                 default:
@@ -238,10 +241,9 @@ void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow)
 
 // Draw Main Scene
 //----------------------------------------------------------------------------------
-void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint,
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint, SceneType *currentScene,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive)
 {
-    
     // Draw Edges
     for (int i = 0; i < pointCount; i++) {
         for (int j = 0; j < pointCount; j++)
@@ -277,12 +279,18 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
     }
 
     // Draw Configs
-    if (GuiButton((Rectangle){12, 12, 24, 24}, "#185#"))
+    if (GuiButton((Rectangle){12, 12, 24, 24}, "#56#"))
+        *currentScene = START_MENU;
+    if (GuiButton((Rectangle){48, 12, 24, 24}, "#185#"))
         createPointPolygon(points, pointCount, graphRadius);
-    if (GuiButton((Rectangle){48, 12, 200, 24}, "Show Adjacency Matrix"))
+    if (GuiButton((Rectangle){84, 12, 200, 24}, "Show Adjacency Matrix"))
         *adjacencyMatrixWindowActive = !(*adjacencyMatrixWindowActive);
-    GuiLabel((Rectangle){ 12, 48, 160, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
-    GuiSliderBar((Rectangle){ 12, 72, 140, 24 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
+
+    // Draw Algorithm Buttons
+    // GuiTextBox((Rectangle){12, 48, 60, 24}, "A", 4096, false);
+    // GuiButton((Rectangle){84, 48, 200, 24}, "Breadth First Search");
+    // GuiTextBox((Rectangle){12, 84, 60, 24}, "B", 4096, false);
+    // GuiButton((Rectangle){84, 84, 200, 24}, "Depth First Search");
 
     // Draw Adjacency Matrix Window
     if (*adjacencyMatrixWindowActive)
@@ -298,13 +306,15 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                 if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}))
                 {
                     GuiValueBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, "", &(*theGraph).adj[i][j], 0, INT_MAX, true);
-                    *focusedPoint = i; // Why does this not work?
+                    DrawCircleLinesV(points[i], 24.0f, RED);
+                    DrawCircleLinesV(points[i], 25.0f, RED);
+                    DrawCircleLinesV(points[i], 26.0f, RED);
+                    DrawCircleLinesV(points[j], 24.0f, LIME);
+                    DrawCircleLinesV(points[j], 25.0f, LIME);
+                    DrawCircleLinesV(points[j], 26.0f, LIME);
                 }
                 else
-                {
                     GuiValueBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, "", &(*theGraph).adj[i][j], 0, INT_MAX, false);
-                    *focusedPoint = -1;
-                }
             }
             GuiLabel((Rectangle){windowX + 16, 72 + 50 * i, 40, 40}, (*theGraph).labels[i]);
             GuiLabel((Rectangle){windowX + 56 + 50 * i, 36, 40, 40}, (*theGraph).labels[i]);
@@ -315,6 +325,8 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
     if (*debugInfoActive)
     {
         DrawFPS(screenWidth - 80, 10);
+        GuiLabel((Rectangle){ 12, screenHeight - 96, 160, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
+        GuiSliderBar((Rectangle){ 12, screenHeight - 72, 140, 24 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
         GuiLabel((Rectangle){ 12, screenHeight - 36, 160, 24 }, TextFormat("Focused Point: %i", (int)*focusedPoint));
 
         for (int i = 0; i < pointCount; i++)
