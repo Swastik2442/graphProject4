@@ -12,6 +12,7 @@
 
 #include "graph.h"
 #include "csv.h"
+#include "priorityQueue.h"
 
 #define MAX_POINTS 64
 
@@ -74,6 +75,17 @@ typedef struct dfsThreadData
     bool *animationActive; // Animation Active Flag
 } dfsThreadData;
 
+typedef struct dijkstraThreadData
+{
+    ThreadStatus *status;  // Thread Status
+    Graph *theGraph;       // Graph
+    char *startLabel;      // Starting Label
+    int *distance;         // Distance Array
+    int *previous;         // Previous Array
+    priorityQueue *pQueue; // Priority Queue
+    bool *animationActive; // Animation Active Flag
+} dijkstraThreadData;
+
 //------------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------------
@@ -84,6 +96,7 @@ void createPointPolygon(
     int pointCount,  // Point Count
     int radius       // Polygon Radius
 );
+void delay(int intensity);
 
 void *csvThread(void *arg);
 void *bfsThread(void *arg);
@@ -110,14 +123,9 @@ void mainScene(
     int pointCount,                    // Point Count
     int *focusedPoint,                 // Focused Point
     SceneType *currentScene,           // Current Scene
-    bool *bfsActive,                   // BFS Active Flag
-    bool *dfsActive,                   // DFS Active Flag
-    bool *dijkstraActive,              // Dijkstra Active Flag
-    char *bfsLabel,                    // BFS Label
-    char *dfsLabel,                    // DFS Label
-    char *dijkstraLabel,               // Dijkstra Label
     bfsThreadData *bfsData,            // BFS Thread Data
     dfsThreadData *dfsData,            // DFS Thread Data
+    dijkstraThreadData *dijkstraData,  // Dijkstra Thread Data
     bool *adjacencyMatrixWindowActive, // Adjacency Matrix Window Active Flag
     float *edgeThickness,              // Edge Thickness
     bool debugInfoActive               // Debug Information Active Flag
@@ -165,7 +173,8 @@ int main(void)
     }
     float edgeThickness = 4.0f;
     bool visitedVertices[MAX_POINTS];
-    int dsArray[MAX_POINTS];
+    int dsArray1[MAX_POINTS], dsArray2[MAX_POINTS];
+    priorityQueue pQueue;
     int qFront, qRear, stackTop;
 
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
@@ -195,10 +204,12 @@ int main(void)
     ThreadStatus csvStatus = NOT_STARTED;
     ThreadStatus bfsStatus = NOT_STARTED;
     ThreadStatus dfsStatus = NOT_STARTED;
+    ThreadStatus dijkstraStatus = NOT_STARTED;
 
     csvThreadData csvData = {&csvStatus, csvFilePath, points, &pointCount, &theGraph, bfsLabel, dfsLabel, dijkstraLabel};
-    bfsThreadData bfsData = {&bfsStatus, &theGraph, bfsLabel, visitedVertices, dsArray, &qFront, &qRear, &bfsActive};
-    dfsThreadData dfsData = {&dfsStatus, &theGraph, dfsLabel, visitedVertices, dsArray, &stackTop, &dfsActive};
+    bfsThreadData bfsData = {&bfsStatus, &theGraph, bfsLabel, visitedVertices, dsArray1, &qFront, &qRear, &bfsActive};
+    dfsThreadData dfsData = {&dfsStatus, &theGraph, dfsLabel, visitedVertices, dsArray1, &stackTop, &dfsActive};
+    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, dijkstraLabel, dsArray1, dsArray2, &pQueue, &dijkstraActive};
 
     // Set custom GUI Style
 
@@ -270,18 +281,21 @@ int main(void)
                     UnloadDroppedFiles(droppedFiles);
                 }
 
-                // BFS Logic
+                // Animation Logic
                 if (bfsActive && !dfsActive && !dijkstraActive && bfsStatus != IN_PROGRESS)
                 {
                     bfsStatus = NOT_STARTED;
                     pthread_create(&bfsThreadID, NULL, bfsThread, (void *)&bfsData);
                 }
-
-                // DFS Logic
-                if (!bfsActive && dfsActive && !dijkstraActive && dfsStatus != IN_PROGRESS)
+                else if (!bfsActive && dfsActive && !dijkstraActive && dfsStatus != IN_PROGRESS)
                 {
                     dfsStatus = NOT_STARTED;
                     pthread_create(&dfsThreadID, NULL, dfsThread, (void *)&dfsData);
+                }
+                else if (!bfsActive && !dfsActive && dijkstraActive && dijkstraStatus != IN_PROGRESS)
+                {
+                    dijkstraStatus = NOT_STARTED;
+                    pthread_create(&dijkstraThreadID, NULL, dijkstraThread, (void *)&dijkstraData);
                 }
 
                 break;
@@ -311,9 +325,7 @@ int main(void)
                 {
                     mainScene(
                         points, &theGraph, pointCount, &focusedPoint, &currentScene,
-                        &bfsActive, &dfsActive, &dijkstraActive,
-                        bfsLabel, dfsLabel, dijkstraLabel,
-                        &bfsData, &dfsData,
+                        &bfsData, &dfsData, &dijkstraData,
                         &adjacencyMatrixWindowActive, &edgeThickness, debugInfoActive
                     );
                     break;
@@ -376,9 +388,7 @@ void startMenu(SceneType *currentScene, bool *exitWindow)
 // Draw Main Scene
 //----------------------------------------------------------------------------------
 void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint, SceneType *currentScene,
-               bool *bfsActive, bool *dfsActive, bool *dijkstraActive,
-               char *bfsLabel, char *dfsLabel, char *dijkstraLabel,
-               bfsThreadData *bfsData, dfsThreadData *dfsData,
+               bfsThreadData *bfsData, dfsThreadData *dfsData, dijkstraThreadData *dijkstraData,
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool debugInfoActive)
 {
     // Draw Edges
@@ -424,38 +434,38 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         *adjacencyMatrixWindowActive = !(*adjacencyMatrixWindowActive);
 
     // Draw Algorithm Buttons
-    if (GuiButton((Rectangle){84, bfsOffset, 200, 24}, "Breadth-First Search") && !(*bfsActive))
+    if (GuiButton((Rectangle){84, bfsOffset, 200, 24}, "Breadth-First Search") && !(*(bfsData->animationActive)))
     {
-        *bfsActive = true;
-        *dfsActive = false;
-        *dijkstraActive = false;
+        *(bfsData->animationActive) = true;
+        *(dfsData->animationActive) = false;
+        *(dijkstraData->animationActive) = false;
     }
-    if (GuiButton((Rectangle){84, dfsOffset, 200, 24}, "Depth-First Search") && !(*dfsActive))
+    if (GuiButton((Rectangle){84, dfsOffset, 200, 24}, "Depth-First Search") && !(*(dfsData->animationActive)))
     {
-        *bfsActive = false;
-        *dfsActive = true;
-        *dijkstraActive = false;
+        *(bfsData->animationActive) = false;
+        *(dfsData->animationActive) = true;
+        *(dijkstraData->animationActive) = false;
     }
-    if (GuiButton((Rectangle){84, dijkstraOffset, 200, 24}, "Dijkstra's Algorithm") && !(*dijkstraActive))
+    if (GuiButton((Rectangle){84, dijkstraOffset, 200, 24}, "Dijkstra's Algorithm") && !(*(dijkstraData->animationActive)))
     {
-        *bfsActive = false;
-        *dfsActive = false;
-        *dijkstraActive = true;
+        *(bfsData->animationActive) = false;
+        *(dfsData->animationActive) = false;
+        *(dijkstraData->animationActive) = true;
     }
 
     // Draw Algorithm Start Labels
-    GuiTextBox((Rectangle){12, bfsOffset, 60, 24}, bfsLabel, 4096, 
-        (!(*bfsActive) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){12, bfsOffset, 60, 24})) ? true : false
+    GuiTextBox((Rectangle){12, bfsOffset, 60, 24}, bfsData->startLabel, 4096, 
+        (!(*(bfsData->animationActive)) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){12, bfsOffset, 60, 24})) ? true : false
     );
-    GuiTextBox((Rectangle){12, dfsOffset, 60, 24}, dfsLabel, 4096,
-        (!(*dfsActive) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){12, dfsOffset, 60, 24})) ? true : false
+    GuiTextBox((Rectangle){12, dfsOffset, 60, 24}, dfsData->startLabel, 4096,
+        (!(*(dfsData->animationActive)) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){12, dfsOffset, 60, 24})) ? true : false
     );
-    GuiTextBox((Rectangle){12, dijkstraOffset, 60, 24}, dijkstraLabel, 4096,
-        (!(*dijkstraActive) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){12, dijkstraOffset, 60, 24})) ? true : false
+    GuiTextBox((Rectangle){12, dijkstraOffset, 60, 24}, dijkstraData->startLabel, 4096,
+        (!(*(dijkstraData->animationActive)) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){12, dijkstraOffset, 60, 24})) ? true : false
     );
 
     // Draw Algorithm Results
-    if (*bfsActive && !(*dfsActive) && !(*dijkstraActive))
+    if (*(bfsData->animationActive) && !(*(dfsData->animationActive)) && !(*(dijkstraData->animationActive)))
     {
         int visitedX = halfScreenWidth + halfScreenWidth / 2;
         int visitedY = halfScreenHeight - 12 * pointCount;
@@ -479,7 +489,7 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
             );
         }
     }
-    else if (!(*bfsActive) && *dfsActive && !(*dijkstraActive))
+    else if (!(*(bfsData->animationActive)) && *(dfsData->animationActive) && !(*(dijkstraData->animationActive)))
     {
         int stackX = halfScreenWidth + halfScreenWidth / 2 + 13;
         int visitedX = stackX + 63;
@@ -498,6 +508,29 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
             GuiLabel((Rectangle){visitedX, currY, 24, 24}, theGraph->labels[i]);
             GuiTextBox((Rectangle){visitedX + 24, currY, 24, 24},
                 (dfsData->visited[i]) ? "#112#" : "#113#",
+                0, false
+            );
+        }
+    }
+    else if (!(*(bfsData->animationActive)) && !(*(dfsData->animationActive)) && *(dijkstraData->animationActive))
+    {
+        int labelX = halfScreenWidth + halfScreenWidth / 2 - 24;
+        int parentX = labelX + 37;
+        int distanceX = parentX + 62;
+        int dsY = halfScreenHeight - 12 * pointCount;
+        GuiLabel((Rectangle){parentX - 13, dsY - 24, 50, 24}, "Parent");
+        GuiLabel((Rectangle){distanceX - 1, dsY - 24, 60, 24}, "Distance");
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            int currY = dsY + 24 * i;
+            GuiLabel((Rectangle){labelX, currY, 24, 24}, theGraph->labels[i]);
+            GuiTextBox((Rectangle){parentX, currY, 24, 24},
+                dijkstraData->previous[i] == -1 ? "" : theGraph->labels[dijkstraData->previous[i]],
+                0, false
+            );
+            GuiTextBox((Rectangle){distanceX + 24, currY, 24, 24},
+                (dijkstraData->distance[i] != INT_MAX) ? (char*)TextFormat("%d", dijkstraData->distance[i]) : "#219#",
                 0, false
             );
         }
@@ -551,6 +584,15 @@ void createPointPolygon(Vector2 *points, int pointCount, int radius)
     int arrSize = (pointCount <= MAX_POINTS) ? pointCount : MAX_POINTS;
     for (int i = 0; i < arrSize; i++)
         points[i] = (Vector2){halfScreenWidth + radius * cos(2 * PI * i / arrSize), halfScreenHeight + radius * sin(2 * PI * i / arrSize)};
+}
+//----------------------------------------------------------------------------------
+
+// Cause Delay in Execution
+//----------------------------------------------------------------------------------
+void delay(int intensity)
+{
+    unsigned long long i, check = 1000000000 * intensity;
+    for (i = 0; i < check; i++);
 }
 //----------------------------------------------------------------------------------
 
@@ -610,11 +652,13 @@ void *bfsThread(void *arg)
     *(data->qFront) = 0;
     *(data->qRear) = 0;
 
+    delay(2);
+
     data->visited[u] = true;
-    // printf("%s ", g->labels[u]);
+    // printf("%s ", data->theGraph->labels[u]);
     data->queue[(*(data->qRear))++] = u;
 
-    for (int i = 0; i < 1000000000; i++); // Delay
+    delay(1);
 
     while (*(data->qFront) < *(data->qRear)) {
         u = data->queue[(*(data->qFront))++];
@@ -622,14 +666,14 @@ void *bfsThread(void *arg)
         for (int v = 0; v < data->theGraph->n; v++)
             if (data->theGraph->adj[u][v] && !data->visited[v]) {
                 data->visited[v] = true;
-                // printf("%s ", g->labels[v]);
+                // printf("%s ", data->theGraph->labels[v]);
                 data->queue[(*(data->qRear))++] = v;
             }
 
-        for (int i = 0; i < 1000000000; i++); // Delay
+        delay(1);
     }
 
-    for (int i = 0; i < INT_MAX; i++); // Delay
+    delay(2);
 
     *(data->status) = COMPLETED;
     *(data->animationActive) = false;
@@ -660,14 +704,17 @@ void *dfsThread(void *arg)
     }
 
     *(data->sTop) = 0;
+
+    delay(2);
+
     data->visited[u] = true;
     data->stack[(*(data->sTop))++] = u;
 
-    for (int i = 0; i < 1000000000; i++); // Delay
+    delay(1);
 
     while (*(data->sTop) > 0) {
         u = data->stack[--(*(data->sTop))];
-        // printf("%s ", g->labels[u]);
+        // printf("%s ", data->theGraph->labels[u]);
 
         for (int v = 0; v < data->theGraph->n; v++)
         {
@@ -676,10 +723,10 @@ void *dfsThread(void *arg)
                 data->stack[(*(data->sTop))++] = v;
             }
         }
-        for (int i = 0; i < 1000000000; i++); // Delay
+        delay(1);
     }
 
-    for (int i = 0; i < INT_MAX; i++); // Delay
+    delay(2);
 
     *(data->status) = COMPLETED;
     *(data->animationActive) = false;
@@ -691,6 +738,57 @@ void *dfsThread(void *arg)
 //----------------------------------------------------------------------------------
 void *dijkstraThread(void *arg)
 {
+    dijkstraThreadData *data = (dijkstraThreadData *)arg;
+    *(data->status) = IN_PROGRESS;
+
+    int u;
+    for (u = 0; u < data->theGraph->n; u++)
+        if (strcmp(data->theGraph->labels[u], data->startLabel) == 0)
+            break;
+    if (u == data->theGraph->n)
+    {
+        *(data->status) = COMPLETED;
+        *(data->animationActive) = false;
+        return NULL;
+    }
+
+    pQueueInit(data->pQueue);
+    delay(2);
+
+    data->distance[u] = 0;
+    data->previous[u] = -1;
+    pQueueInsert(data->pQueue, u, 0);
+    for (int i = 0; i < data->theGraph->n; i++)
+    {
+        if (i == u)
+            continue;
+        data->distance[i] = INT_MAX;
+        data->previous[i] = -1;
+        pQueueInsert(data->pQueue, i, INT_MAX);
+    }
+
+    delay(1);
+
+    while (data->pQueue->filled > 0)
+    {
+        u = pQueueExtractMin(data->pQueue);
+
+        for (int v = 0; v < data->theGraph->n; v++)
+            if (data->theGraph->adj[u][v] && data->distance[v] > data->distance[u] + data->theGraph->adj[u][v])
+            {
+                data->distance[v] = data->distance[u] + data->theGraph->adj[u][v];
+                data->previous[v] = u;
+                pQueueDecreaseKey(data->pQueue, v, data->distance[v]);
+            }
+        
+        delay(1);
+    }
+
+    delay(2);
+    pQueueDeinit(data->pQueue);
+
+    *(data->status) = COMPLETED;
+    *(data->animationActive) = false;
     return NULL;
 }
 //----------------------------------------------------------------------------------
