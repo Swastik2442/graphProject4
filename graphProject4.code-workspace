@@ -12,7 +12,10 @@
 			"stdio.h": "c",
 			"*.m": "c",
 			"*.tcc": "c",
-			"cstdio": "c"
+			"cstdio": "c",
+			"array": "c",
+			"string": "c",
+			"string_view": "c"
 		}
 	}
 }

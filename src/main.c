@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
@@ -13,13 +14,35 @@
 #define MAX_POINTS 64
 
 // Screen Size
+
 const int screenWidth = 1280;
 const int screenHeight = 720;
 const int halfScreenWidth = screenWidth / 2;
 const int halfScreenHeight = screenHeight / 2;
 
 // Constants
+
 const int graphRadius = 200;
+
+//------------------------------------------------------------------------------------
+// Thread Data Structures
+
+typedef struct csvData
+{
+    char *csvFilePath;
+    Vector2 *points;
+    Graph *theGraph;
+    int *pointCount;
+} csvData;
+
+//------------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------------
+// Utility Functions
+
+void createPointPolygon(Vector2 *points, int pointCount, int radius);
+void *csvThread(void *arg);
+//------------------------------------------------------------------------------------
 
 // Scene Types
 typedef enum {
@@ -29,14 +52,10 @@ typedef enum {
 
 //------------------------------------------------------------------------------------
 // All the Scenes
-void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow);
-void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint, SceneType *currentScene,
-               bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive);
-//------------------------------------------------------------------------------------
 
-//------------------------------------------------------------------------------------
-// Utility Functions
-void createPointPolygon(Vector2 *points, int pointCount, int radius);
+void startMenu(SceneType *currentScene, bool *exitWindow);
+void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint, SceneType *currentScene,
+               bool *adjacencyMatrixWindowActive, float *edgeThickness, bool debugInfoActive);
 //------------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------------
@@ -51,11 +70,13 @@ int main(void)
     InitWindow(screenWidth, screenHeight, "Graph Project 4 - Output and Display");
 
     // Scene Configuration
+
     SceneType currentScene = START_MENU;
     bool exitWindow = false;
     bool debugInfoActive = false;
 
     // Points Configuration
+
     int pointCount = 6;
     int selectedPoint = -1;
     int focusedPoint = -1;
@@ -64,6 +85,7 @@ int main(void)
     createPointPolygon(points, pointCount, graphRadius);
 
     // Graph Configuration
+
     Graph theGraph;
     {
         char *labels[] = {"A", "B", "C", "D", "E", "F"};
@@ -75,17 +97,21 @@ int main(void)
         addEdge(&theGraph, "E", "F");
         addEdge(&theGraph, "F", "A");
     }
+    float edgeThickness = 4.0f;
 
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
     TextCopy(csvFilePath, "Drop a CSV File Here");
 
-    // Edge Config Variables
-    float edgeThickness = 4.0f;
-
     // Windows Configuration
+
     bool adjacencyMatrixWindowActive = false;
 
+    // Threading Configuration
+
+    pthread_t csvThreadID = PTHREAD_ONCE_INIT;
+
     // Set custom GUI Style
+
     GuiSetStyle(DEFAULT, TEXT_SIZE, 14);
     GuiSetStyle(DEFAULT, TEXT_SPACING, 2);
 
@@ -106,15 +132,10 @@ int main(void)
                 {
                     if (IsKeyPressed(KEY_ENTER))
                         currentScene = MAIN_SCENE;
-                    if (IsKeyPressed(KEY_F1))
-                        debugInfoActive = !debugInfoActive;
                     break;
                 }
             case MAIN_SCENE:
                 {
-                    if (IsKeyPressed(KEY_F1))
-                        debugInfoActive = !debugInfoActive;
-
                     // Point Creation Logic
                     if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && (pointCount < MAX_POINTS) && (focusedPoint == -1) && (!adjacencyMatrixWindowActive))
                     {
@@ -151,21 +172,9 @@ int main(void)
 
                         if ((droppedFiles.count > 0) && IsFileExtension(droppedFiles.paths[0], ".csv"))
                         {
-                            // TODO - Refactor this into a Thread
                             TextCopy(csvFilePath, droppedFiles.paths[0]);
-                            char *csvData[MAX_CSV_ROWS][MAX_CSV_COLS];
-                            int csvRows, csvCols, csvN;
-                            readCSV(csvFilePath, csvData, &csvRows, &csvCols);
-                            csvN = (csvRows <= csvCols) ? csvRows : csvCols;
-                            int adj[csvN][csvN];
-                            for (int i = 1; i < csvN; i++)
-                            {
-                                for (int j = 1; j < csvN; j++)
-                                    adj[i-1][j-1] = strtol(csvData[i][j], NULL, 10);
-                            }
-                            pointCount = csvN-1;
-                            editGraph(&theGraph, pointCount, csvData[0]+1, adj);
-                            createPointPolygon(points, pointCount, graphRadius);
+                            csvData data = {csvFilePath, points, &theGraph, &pointCount};
+                            pthread_create(&csvThreadID, NULL, csvThread, &data);                            
                         }
 
                         UnloadDroppedFiles(droppedFiles);
@@ -177,6 +186,10 @@ int main(void)
                 break;
         }
 
+        // Toggle Debug Information
+        if (IsKeyPressed(KEY_F1))
+            debugInfoActive = !debugInfoActive;
+
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
@@ -187,14 +200,14 @@ int main(void)
             {
                 case START_MENU:
                 {
-                    startMenu(&currentScene, &debugInfoActive, &exitWindow);
+                    startMenu(&currentScene, &exitWindow);
                     break;
                 }
                 case MAIN_SCENE:
                 {
                     mainScene(
                         points, &theGraph, pointCount, &focusedPoint, &currentScene,
-                        &adjacencyMatrixWindowActive, &edgeThickness, &debugInfoActive
+                        &adjacencyMatrixWindowActive, &edgeThickness, debugInfoActive
                     );
                     break;
                 }
@@ -202,12 +215,19 @@ int main(void)
                     break;
             }
 
+            // Draw Debug Information
+            if (debugInfoActive)
+                DrawFPS(screenWidth - 80, 10);
+
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
 
+
     // De-Initialization
     //--------------------------------------------------------------------------------------
+    pthread_join(csvThreadID, NULL);
+
     graphDeinit(&theGraph);
 
     RL_FREE(csvFilePath);
@@ -220,13 +240,8 @@ int main(void)
 
 // Draw Start Menu
 //----------------------------------------------------------------------------------
-void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow)
+void startMenu(SceneType *currentScene, bool *exitWindow)
 {
-    // Draw Debug Information
-    if (*debugInfoActive)
-    {
-        DrawFPS(screenWidth - 80, 10);
-    }
 
     // Draw Menu Options
     GuiGroupBox((Rectangle){halfScreenWidth - 250, halfScreenHeight - 150, 500, 300}, "Graph Output and Display Project");
@@ -242,7 +257,7 @@ void startMenu(SceneType *currentScene, bool *debugInfoActive, bool *exitWindow)
 // Draw Main Scene
 //----------------------------------------------------------------------------------
 void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoint, SceneType *currentScene,
-               bool *adjacencyMatrixWindowActive, float *edgeThickness, bool *debugInfoActive)
+               bool *adjacencyMatrixWindowActive, float *edgeThickness, bool debugInfoActive)
 {
     // Draw Edges
     for (int i = 0; i < pointCount; i++) {
@@ -322,9 +337,8 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
     }
 
     // Draw Debug Information
-    if (*debugInfoActive)
+    if (debugInfoActive)
     {
-        DrawFPS(screenWidth - 80, 10);
         GuiLabel((Rectangle){ 12, screenHeight - 96, 160, 24 }, TextFormat("Edge Thickness: %i", (int)*edgeThickness));
         GuiSliderBar((Rectangle){ 12, screenHeight - 72, 140, 24 }, NULL, NULL, edgeThickness, 1.0f, 40.0f);
         GuiLabel((Rectangle){ 12, screenHeight - 36, 160, 24 }, TextFormat("Focused Point: %i", (int)*focusedPoint));
@@ -335,7 +349,6 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
 }
 //----------------------------------------------------------------------------------
 
-
 // Create a Polygon of Points
 //----------------------------------------------------------------------------------
 void createPointPolygon(Vector2 *points, int pointCount, int radius)
@@ -343,5 +356,30 @@ void createPointPolygon(Vector2 *points, int pointCount, int radius)
     int arrSize = (pointCount <= MAX_POINTS) ? pointCount : MAX_POINTS;
     for (int i = 0; i < arrSize; i++)
         points[i] = (Vector2){halfScreenWidth + radius * cos(2 * PI * i / arrSize), halfScreenHeight + radius * sin(2 * PI * i / arrSize)};
+}
+//----------------------------------------------------------------------------------
+
+// Thread Function to read Graph CSV File
+//----------------------------------------------------------------------------------
+void *csvThread(void *arg)
+{
+    csvData *data = (csvData *)arg;
+
+    char *csvData[MAX_CSV_ROWS][MAX_CSV_COLS];
+    int csvRows, csvCols, csvN;
+    readCSV(data->csvFilePath, csvData, &csvRows, &csvCols);
+
+    csvN = (csvRows <= csvCols) ? csvRows : csvCols;
+    int adj[csvN][csvN];
+    for (int i = 1; i < csvN; i++)
+    {
+        for (int j = 1; j < csvN; j++)
+            adj[i-1][j-1] = strtol(csvData[i][j], NULL, 10);
+    }
+    *(data->pointCount) = csvN-1;
+    editGraph(data->theGraph, *(data->pointCount), csvData[0]+1, adj);
+    createPointPolygon(data->points, *(data->pointCount), graphRadius);
+
+    return NULL;
 }
 //----------------------------------------------------------------------------------
