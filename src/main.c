@@ -585,7 +585,7 @@ void *csvThread(void *arg)
 }
 //----------------------------------------------------------------------------------
 
-// Thread Function to render Breadth-First Search
+// Thread Function to perform Breadth-First Search
 //----------------------------------------------------------------------------------
 void *bfsThread(void *arg)
 {
@@ -637,7 +637,7 @@ void *bfsThread(void *arg)
 }
 //----------------------------------------------------------------------------------
 
-// Thread Function to render Depth-First Search
+// Thread Function to perform Depth-First Search
 //----------------------------------------------------------------------------------
 void *dfsThread(void *arg)
 {
@@ -687,7 +687,7 @@ void *dfsThread(void *arg)
 }
 //----------------------------------------------------------------------------------
 
-// Thread Function to render Dijkstra's Algorithm
+// Thread Function to perform Dijkstra's Algorithm
 //----------------------------------------------------------------------------------
 void *dijkstraThread(void *arg)
 {

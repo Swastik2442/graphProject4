@@ -1,12 +1,14 @@
 #ifndef _GRAPH_H_
 #define _GRAPH_H_
 
+#include "priorityQueue.h"
+
 #define MAX_VERTICES 64
 
 typedef struct graph_t {
-    int n;
-    char *labels[MAX_VERTICES];
-    int adj[MAX_VERTICES][MAX_VERTICES];
+    int n;                               // Number of Vertices
+    char *labels[MAX_VERTICES];          // Vertex Labels
+    int adj[MAX_VERTICES][MAX_VERTICES]; // Adjacency Matrix
 } Graph;
 
 void graphInit(Graph *g, int n, char *labels[n]);
@@ -22,5 +24,7 @@ void breadthFirstSearch(Graph *g, char *label);
 void bfs(Graph *g, int u, int visited[]);
 void depthFirstSearch(Graph *g, char *label);
 void dfs(Graph *g, int u, int visited[]);
+void dijkstra(Graph *g, char *label);
+void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDistance);
 
 #endif

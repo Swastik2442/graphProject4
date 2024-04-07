@@ -173,3 +173,55 @@ void dfs(Graph *g, int u, int visited[])
             }
     }
 }
+
+// Dijkstra's Algorithm
+void dijkstra(Graph *g, char *label)
+{
+    int u;
+    for (u = 0; u < g->n; u++)
+        if (strcmp(g->labels[u], label) == 0)
+            break;
+    if (u == g->n)
+        return;
+    
+    int dist[MAX_VERTICES];
+    int prev[MAX_VERTICES];
+    priorityQueue verticesWithDistance;
+    pQueueInit(&verticesWithDistance);
+
+    djk(g, u, dist, prev, &verticesWithDistance);
+
+    pQueueDeinit(&verticesWithDistance);
+}
+
+// Helper Function for Dijkstra's Algorithm
+void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDistance)
+{
+    dist[u] = 0;
+    prev[u] = -1;
+    pQueueInsert(verticesWithDistance, u, 0);
+    for (int i = 0; i < g->n; i++)
+    {
+        if (i == u)
+            continue;
+        dist[i] = INT_MAX;
+        prev[i] = -1;
+        pQueueInsert(verticesWithDistance, i, INT_MAX);
+    }
+
+    while (verticesWithDistance->filled > 0)
+    {
+        u = pQueueExtractMin(verticesWithDistance);
+
+        for (int v = 0; v < g->n; v++)
+            if (g->adj[u][v] && dist[v] > dist[u] + g->adj[u][v])
+            {
+                dist[v] = dist[u] + g->adj[u][v];
+                prev[v] = u;
+                pQueueDecreaseKey(verticesWithDistance, v, dist[v]);
+            }
+    }
+
+    for (int i = 0; i < g->n; i++)
+        printf("%s <- %s: %d\n", g->labels[i], (prev[i] >= 0) ? g->labels[prev[i]] : g->labels[i], dist[i]);
+}
