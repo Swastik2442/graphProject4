@@ -86,6 +86,9 @@ typedef struct dijkstraThreadData
     ThreadStatus *status;  // Thread Status
     Graph *theGraph;       // Graph
     char *startLabel;      // Starting Label
+    int *current;          // Current Vertex
+    int *children;         // Children Array
+    int *childrenTop;      // Children Top Index
     int *distance;         // Distance Array
     int *previous;         // Previous Array
     priorityQueue *pQueue; // Priority Queue
@@ -101,6 +104,11 @@ void createPointPolygon(
     Vector2 *points, // Points Array
     int pointCount,  // Point Count
     int radius       // Polygon Radius
+);
+void drawArrow(
+    Vector2 pointA, // Source Point
+    Vector2 pointB, // Destination Point
+    Color color     // Color
 );
 void delay(int intensity);
 
@@ -179,7 +187,7 @@ int main(void)
     }
     float edgeThickness = 4.0f;
     bool visitedVertices[MAX_POINTS];
-    int dsArray1[MAX_POINTS], dsArray2[MAX_POINTS];
+    int dsArray1[MAX_POINTS], dsArray2[MAX_POINTS], dsArray3[MAX_POINTS];
     priorityQueue pQueue;
     int currentV, childTop, qFront, qRear, stackTop;
 
@@ -215,7 +223,7 @@ int main(void)
     csvThreadData csvData = {&csvStatus, csvFilePath, points, &pointCount, &theGraph, bfsLabel, dfsLabel, dijkstraLabel};
     bfsThreadData bfsData = {&bfsStatus, &theGraph, bfsLabel, &currentV, dsArray1, &childTop, visitedVertices, dsArray2, &qFront, &qRear, &bfsActive};
     dfsThreadData dfsData = {&dfsStatus, &theGraph, dfsLabel, &currentV, dsArray1, &childTop, visitedVertices, dsArray2, &stackTop, &dfsActive};
-    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, dijkstraLabel, dsArray1, dsArray2, &pQueue, &dijkstraActive};
+    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, dijkstraLabel, &currentV, dsArray1, &childTop, dsArray2, dsArray3, &pQueue, &dijkstraActive};
 
     // Set custom GUI Style
 
@@ -398,7 +406,8 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                bool *adjacencyMatrixWindowActive, float *edgeThickness, bool debugInfoActive)
 {
     // Draw Edges
-    for (int i = 0; i < pointCount; i++) {
+    for (int i = 0; i < pointCount; i++)
+    {
         for (int j = 0; j < pointCount; j++)
         {
             if ((*theGraph).adj[i][j] >= 1)
@@ -406,16 +415,8 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                 // Draw Edge
                 DrawLineEx(points[i], points[j], *edgeThickness, SKYBLUE);
 
-                // Draw Arrow // TODO: Refactor this into a Better Function
-                Vector2 distPoint = {points[j].x - points[i].x, points[j].y - points[i].y};
-                float angle = atan2f(distPoint.y, distPoint.x);
-                Vector2 arrowEndPoint = {points[j].x - (22)*cosf(angle), points[j].y - (22)*sinf(angle)};
-                Vector2 arrowBasePoint = {arrowEndPoint.x - (22)*cosf(angle), arrowEndPoint.y - (22)*sinf(angle)};
-                float side1 = arrowEndPoint.x - points[i].x;
-                float side2 = arrowEndPoint.y - points[i].y;
-                Vector2 endPoint1 = {arrowBasePoint.x - side2 / 24, arrowBasePoint.y + side1 / 24};
-                Vector2 endPoint2 = {arrowBasePoint.x + side2 / 24, arrowBasePoint.y - side1 / 24};
-                DrawTriangle(endPoint2, endPoint1, arrowEndPoint, SKYBLUE);
+                // Draw Arrow
+                drawArrow(points[i], points[j], SKYBLUE);
 
                 // Draw Edge Weights
                 Vector2 midPoint = {(points[i].x + points[j].x) / 2, (points[i].y + points[j].y) / 2};
@@ -487,10 +488,14 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         for (int i = 0; i < pointCount; i++)
         {
             int currY = visitedY + 24 * i;
+
+            // Draw Queue Elements
             GuiTextBox((Rectangle){queueX + 24 * i, queueY, 24, 24},
                 ((*(bfsData->qRear)) - (*(bfsData->qFront)) > i) ? theGraph->labels[bfsData->queue[(*(bfsData->qFront)) + i]] : "",
                 0, false
             );
+
+            // Draw Visited Elements
             GuiLabel((Rectangle){visitedX, currY, 24, 24}, theGraph->labels[i]);
             GuiTextBox((Rectangle){visitedX + 24, currY, 24, 24},
                 (dfsData->visited[i]) ? "#112#" : "#113#",
@@ -505,7 +510,7 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         // Draw Current Vertex
         DrawRing(points[*(bfsData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
 
-        // Draw Queue Elements
+        // Draw Queue Vertices
         for (int i = *(bfsData->qFront); i < *(bfsData->qRear); i++)
             DrawRing(points[bfsData->queue[i]], 24.0f, 26.0f, 0, 360, 90, GREEN);
 
@@ -528,10 +533,14 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         for (int i = 0; i < pointCount; i++)
         {
             int currY = dsY + 24 * i;
+
+            // Draw Stack Elements
             GuiTextBox((Rectangle){stackX, currY, 24, 24},
                 (*(dfsData->sTop) > pointCount - i - 1) ? theGraph->labels[dfsData->stack[pointCount - i - 1]] : "",
                 0, false
             );
+
+            // Draw Visited Elements
             GuiLabel((Rectangle){visitedX, currY, 24, 24}, theGraph->labels[i]);
             GuiTextBox((Rectangle){visitedX + 24, currY, 24, 24},
                 (dfsData->visited[i]) ? "#112#" : "#113#",
@@ -546,7 +555,7 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         // Draw Current Vertex
         DrawRing(points[*(dfsData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
 
-        // Draw Stack Elements
+        // Draw Stack Vertices
         for (int i = 0; i < *(dfsData->sTop); i++)
             DrawRing(points[dfsData->stack[i]], 24.0f, 26.0f, 0, 360, 90, GREEN);
 
@@ -570,23 +579,48 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         for (int i = 0; i < pointCount; i++)
         {
             int currY = dsY + 24 * i;
+
+            // Draw Parent Elements
             GuiLabel((Rectangle){labelX, currY, 24, 24}, theGraph->labels[i]);
             GuiTextBox((Rectangle){parentX, currY, 24, 24},
                 dijkstraData->previous[i] == -1 ? "" : theGraph->labels[dijkstraData->previous[i]],
                 0, false
             );
+
+            // Draw Distance Elements
             GuiTextBox((Rectangle){distanceX + 24, currY, 24, 24},
-                (dijkstraData->distance[i] != INT_MAX) ? (char*)TextFormat("%d", dijkstraData->distance[i]) : "#219#",
+                (dijkstraData->distance[i] != INT_MAX && dijkstraData->distance[i] != INT_MIN) ? (char*)TextFormat("%d", dijkstraData->distance[i]) : "#219#",
                 0, false
             );
 
             // Draw Vertex Distances
-            if (dijkstraData->distance[i] != INT_MAX)
+            if (dijkstraData->distance[i] != INT_MAX && dijkstraData->distance[i] != INT_MIN)
             {
                 DrawText(TextFormat("%d", dijkstraData->distance[i]), points[i].x + 24, points[i].y + 24, 12, BLACK);
-                // TODO: Draw Vertex's Parent
+
+                // Draw Vertex's Parent // TODO: Refactor this to reduce Redundancy
+                if (dijkstraData->previous[i] != -1)
+                {
+                    DrawLineEx(points[dijkstraData->previous[i]], points[i], *edgeThickness, BLACK);
+                    drawArrow(points[dijkstraData->previous[i]], points[i], BLACK);
+                    DrawCircleV(points[i], (*focusedPoint == i)? 30.0f : 24.0f, (*focusedPoint == i)? GRAY: LIGHTGRAY);
+                    DrawText(TextFormat("%s", (*theGraph).labels[i]), points[i].x - 5, points[i].y - 5, 15, BLACK);
+                    DrawCircleV(points[dijkstraData->previous[i]], (*focusedPoint == dijkstraData->previous[i])? 30.0f : 24.0f, (*focusedPoint == dijkstraData->previous[i])? GRAY: LIGHTGRAY);
+                    DrawText(TextFormat("%s", (*theGraph).labels[dijkstraData->previous[i]]), points[dijkstraData->previous[i]].x - 5, points[dijkstraData->previous[i]].y - 5, 15, BLACK);
+                }
             }
         }
+
+        // Draw Current Vertex
+        DrawRing(points[*(dijkstraData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
+
+        // Draw Queue Vertices
+        for (int i = 0; i < dijkstraData->pQueue->filled; i++)
+            DrawRing(points[dijkstraData->pQueue->heap[i].key], 24.0f, 26.0f, 0, 360, 90, GREEN);
+
+        // Draw Children Vertices
+        for (int i = 0; i < *(dijkstraData->childrenTop); i++)
+            DrawRing(points[dijkstraData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
     }
 
     // Draw Adjacency Matrix Window
@@ -634,6 +668,22 @@ void createPointPolygon(Vector2 *points, int pointCount, int radius)
     int arrSize = (pointCount <= MAX_POINTS) ? pointCount : MAX_POINTS;
     for (int i = 0; i < arrSize; i++)
         points[i] = (Vector2){halfScreenWidth + radius * cos(2 * PI * i / arrSize), halfScreenHeight + radius * sin(2 * PI * i / arrSize)};
+}
+//----------------------------------------------------------------------------------
+
+// Draw an Arrow between the two Points
+//----------------------------------------------------------------------------------
+void drawArrow(Vector2 pointA, Vector2 pointB, Color color)
+{
+    Vector2 distPoint = {pointB.x - pointA.x, pointB.y - pointA.y};
+    float angle = atan2f(distPoint.y, distPoint.x);
+    Vector2 arrowEndPoint = {pointB.x - (22)*cosf(angle), pointB.y - (22)*sinf(angle)};
+    Vector2 arrowBasePoint = {arrowEndPoint.x - (22)*cosf(angle), arrowEndPoint.y - (22)*sinf(angle)};
+    float side1 = arrowEndPoint.x - pointA.x;
+    float side2 = arrowEndPoint.y - pointA.y;
+    Vector2 endPoint1 = {arrowBasePoint.x - side2 / 24, arrowBasePoint.y + side1 / 24};
+    Vector2 endPoint2 = {arrowBasePoint.x + side2 / 24, arrowBasePoint.y - side1 / 24};
+    DrawTriangle(endPoint2, endPoint1, arrowEndPoint, color);
 }
 //----------------------------------------------------------------------------------
 
@@ -793,11 +843,10 @@ void *dijkstraThread(void *arg)
     dijkstraThreadData *data = (dijkstraThreadData *)arg;
     *(data->status) = IN_PROGRESS;
 
-    int u;
-    for (u = 0; u < data->theGraph->n; u++)
-        if (strcmp(data->theGraph->labels[u], data->startLabel) == 0)
+    for (*(data->current) = 0; *(data->current) < data->theGraph->n; (*(data->current))++)
+        if (strcmp(data->theGraph->labels[*(data->current)], data->startLabel) == 0)
             break;
-    if (u == data->theGraph->n)
+    if (*(data->current) == data->theGraph->n)
     {
         *(data->status) = COMPLETED;
         *(data->animationActive) = false;
@@ -807,12 +856,12 @@ void *dijkstraThread(void *arg)
     pQueueInit(data->pQueue);
     delay(2);
 
-    data->distance[u] = 0;
-    data->previous[u] = -1;
-    pQueueInsert(data->pQueue, u, 0);
+    data->distance[*(data->current)] = 0;
+    data->previous[*(data->current)] = -1;
+    pQueueInsert(data->pQueue, *(data->current), 0);
     for (int i = 0; i < data->theGraph->n; i++)
     {
-        if (i == u)
+        if (i == *(data->current))
             continue;
         data->distance[i] = INT_MAX;
         data->previous[i] = -1;
@@ -823,16 +872,18 @@ void *dijkstraThread(void *arg)
 
     while (data->pQueue->filled > 0)
     {
-        u = pQueueExtractMin(data->pQueue);
+        *(data->current) = pQueueExtractMin(data->pQueue);
+        *(data->childrenTop) = 0;
 
         for (int v = 0; v < data->theGraph->n; v++)
-            if (data->theGraph->adj[u][v] && data->distance[v] > data->distance[u] + data->theGraph->adj[u][v])
+            if (data->theGraph->adj[*(data->current)][v] && data->distance[v] > data->distance[*(data->current)] + data->theGraph->adj[*(data->current)][v])
             {
-                data->distance[v] = data->distance[u] + data->theGraph->adj[u][v];
-                data->previous[v] = u;
+                data->distance[v] = data->distance[*(data->current)] + data->theGraph->adj[*(data->current)][v];
+                data->previous[v] = *(data->current);
+                data->children[(*(data->childrenTop))++] = v;
                 pQueueDecreaseKey(data->pQueue, v, data->distance[v]);
             }
-        
+
         delay(1);
     }
 
