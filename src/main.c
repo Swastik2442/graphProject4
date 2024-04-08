@@ -57,6 +57,9 @@ typedef struct bfsThreadData
     ThreadStatus *status;  // Thread Status
     Graph *theGraph;       // Graph
     char *startLabel;      // Starting Label
+    int *current;          // Current Vertex
+    int *children;         // Children Array
+    int *childrenTop;      // Children Top Index
     bool *visited;         // Visited Array
     int *queue;            // BFS Queue
     int *qFront;           // Queue Front Index
@@ -69,6 +72,9 @@ typedef struct dfsThreadData
     ThreadStatus *status;  // Thread Status
     Graph *theGraph;       // Graph
     char *startLabel;      // Starting Label
+    int *current;          // Current Vertex
+    int *children;         // Children Array
+    int *childrenTop;      // Children Top Index
     bool *visited;         // Visited Array
     int *stack;            // DFS Stack
     int *sTop;             // Stack Top Index
@@ -175,7 +181,7 @@ int main(void)
     bool visitedVertices[MAX_POINTS];
     int dsArray1[MAX_POINTS], dsArray2[MAX_POINTS];
     priorityQueue pQueue;
-    int qFront, qRear, stackTop;
+    int currentV, childTop, qFront, qRear, stackTop;
 
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
     char *bfsLabel = (char *)RL_CALLOC(4096, 1);
@@ -207,8 +213,8 @@ int main(void)
     ThreadStatus dijkstraStatus = NOT_STARTED;
 
     csvThreadData csvData = {&csvStatus, csvFilePath, points, &pointCount, &theGraph, bfsLabel, dfsLabel, dijkstraLabel};
-    bfsThreadData bfsData = {&bfsStatus, &theGraph, bfsLabel, visitedVertices, dsArray1, &qFront, &qRear, &bfsActive};
-    dfsThreadData dfsData = {&dfsStatus, &theGraph, dfsLabel, visitedVertices, dsArray1, &stackTop, &dfsActive};
+    bfsThreadData bfsData = {&bfsStatus, &theGraph, bfsLabel, &currentV, dsArray1, &childTop, visitedVertices, dsArray2, &qFront, &qRear, &bfsActive};
+    dfsThreadData dfsData = {&dfsStatus, &theGraph, dfsLabel, &currentV, dsArray1, &childTop, visitedVertices, dsArray2, &stackTop, &dfsActive};
     dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, dijkstraLabel, dsArray1, dsArray2, &pQueue, &dijkstraActive};
 
     // Set custom GUI Style
@@ -465,38 +471,60 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
     );
 
     // Draw Algorithm Results
-    if (*(bfsData->animationActive) && !(*(dfsData->animationActive)) && !(*(dijkstraData->animationActive)))
+    if (*(bfsData->animationActive) && !(*(dfsData->animationActive)) && !(*(dijkstraData->animationActive)) && *(bfsData->status) == IN_PROGRESS)
     {
+        // Position Calculation
         int visitedX = halfScreenWidth + halfScreenWidth / 2;
         int visitedY = halfScreenHeight - 12 * pointCount;
         int queueX = visitedX - 12 * pointCount + 25;
         int queueY = visitedY + 24 * pointCount + 48;
+
+        // Draw Labels
         GuiLabel((Rectangle){visitedX - 1, queueY - 24, 50, 24}, "Queue");
         GuiLabel((Rectangle){visitedX - 1, visitedY - 24, 50, 24}, "Visited");
 
+        // Draw Text Structures
         for (int i = 0; i < pointCount; i++)
         {
+            int currY = visitedY + 24 * i;
             GuiTextBox((Rectangle){queueX + 24 * i, queueY, 24, 24},
                 ((*(bfsData->qRear)) - (*(bfsData->qFront)) > i) ? theGraph->labels[bfsData->queue[(*(bfsData->qFront)) + i]] : "",
                 0, false
             );
-
-            int currY = visitedY + 24 * i;
             GuiLabel((Rectangle){visitedX, currY, 24, 24}, theGraph->labels[i]);
             GuiTextBox((Rectangle){visitedX + 24, currY, 24, 24},
                 (dfsData->visited[i]) ? "#112#" : "#113#",
                 0, false
             );
+
+            // Draw Visited Vertices
+            if (bfsData->visited[i])
+                DrawRing(points[i], 24.0f, 26.0f, 0, 360, 90, BLACK);
         }
+
+        // Draw Current Vertex
+        DrawRing(points[*(bfsData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
+
+        // Draw Queue Elements
+        for (int i = *(bfsData->qFront); i < *(bfsData->qRear); i++)
+            DrawRing(points[bfsData->queue[i]], 24.0f, 26.0f, 0, 360, 90, GREEN);
+
+        // Draw Children Vertices
+        for (int i = 0; i < *(bfsData->childrenTop); i++)
+            DrawRing(points[bfsData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
     }
-    else if (!(*(bfsData->animationActive)) && *(dfsData->animationActive) && !(*(dijkstraData->animationActive)))
+    else if (!(*(bfsData->animationActive)) && *(dfsData->animationActive) && !(*(dijkstraData->animationActive)) && *(dfsData->status) == IN_PROGRESS)
     {
+        // Position Calculation
         int stackX = halfScreenWidth + halfScreenWidth / 2 + 13;
         int visitedX = stackX + 63;
         int dsY = halfScreenHeight - 12 * pointCount;
+
+        // Draw Labels
         GuiLabel((Rectangle){stackX - 13, dsY - 24, 50, 24}, "Stack");
         GuiLabel((Rectangle){visitedX - 1, dsY - 24, 50, 24}, "Visited");
 
+        // Draw Text Structures
         for (int i = 0; i < pointCount; i++)
         {
             int currY = dsY + 24 * i;
@@ -504,23 +532,41 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                 (*(dfsData->sTop) > pointCount - i - 1) ? theGraph->labels[dfsData->stack[pointCount - i - 1]] : "",
                 0, false
             );
-            
             GuiLabel((Rectangle){visitedX, currY, 24, 24}, theGraph->labels[i]);
             GuiTextBox((Rectangle){visitedX + 24, currY, 24, 24},
                 (dfsData->visited[i]) ? "#112#" : "#113#",
                 0, false
             );
+
+            // Draw Visited Vertices
+            if (dfsData->visited[i])
+                DrawRing(points[i], 24.0f, 26.0f, 0, 360, 90, BLACK);
         }
+
+        // Draw Current Vertex
+        DrawRing(points[*(dfsData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
+
+        // Draw Stack Elements
+        for (int i = 0; i < *(dfsData->sTop); i++)
+            DrawRing(points[dfsData->stack[i]], 24.0f, 26.0f, 0, 360, 90, GREEN);
+
+        // Draw Children Vertices
+        for (int i = 0; i < *(dfsData->childrenTop); i++)
+            DrawRing(points[dfsData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
     }
-    else if (!(*(bfsData->animationActive)) && !(*(dfsData->animationActive)) && *(dijkstraData->animationActive))
+    else if (!(*(bfsData->animationActive)) && !(*(dfsData->animationActive)) && *(dijkstraData->animationActive) && *(dijkstraData->status) == IN_PROGRESS)
     {
+        // Position Calculation
         int labelX = halfScreenWidth + halfScreenWidth / 2 - 24;
         int parentX = labelX + 37;
         int distanceX = parentX + 62;
         int dsY = halfScreenHeight - 12 * pointCount;
+
+        // Draw Labels
         GuiLabel((Rectangle){parentX - 13, dsY - 24, 50, 24}, "Parent");
         GuiLabel((Rectangle){distanceX - 1, dsY - 24, 60, 24}, "Distance");
 
+        // Draw Text Structures
         for (int i = 0; i < pointCount; i++)
         {
             int currY = dsY + 24 * i;
@@ -533,6 +579,13 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                 (dijkstraData->distance[i] != INT_MAX) ? (char*)TextFormat("%d", dijkstraData->distance[i]) : "#219#",
                 0, false
             );
+
+            // Draw Vertex Distances
+            if (dijkstraData->distance[i] != INT_MAX)
+            {
+                DrawText(TextFormat("%d", dijkstraData->distance[i]), points[i].x + 24, points[i].y + 24, 12, BLACK);
+                // TODO: Draw Vertex's Parent
+            }
         }
     }
 
@@ -547,10 +600,7 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         {
             for (int j = 0; j < pointCount; j++)
             {
-                if (
-                    CheckCollisionPointRec(GetMousePosition(), (Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}) ||
-                    CheckCollisionPointRec(GetMousePosition(), (Rectangle){windowX + 40 + 50 * i, 72 + 50 * j, 40, 40})
-                )
+                if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}))
                 {
                     GuiValueBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, "", &(*theGraph).adj[i][j], 0, INT_MAX, true);
                     DrawRing(points[i], 24.0f, 26.0f, 0, 360, 90, RED);
@@ -637,12 +687,11 @@ void *bfsThread(void *arg)
     for (int i = 0; i < data->theGraph->n; i++)
         data->visited[i] = false;
 
-    int u;
-    for (u = 0; u < data->theGraph->n; u++)
-        if (strcmp(data->theGraph->labels[u], data->startLabel) == 0)
+    for (*(data->current) = 0; *(data->current) < data->theGraph->n; (*(data->current))++)
+        if (strcmp(data->theGraph->labels[*(data->current)], data->startLabel) == 0)
             break;
 
-    if (u == data->theGraph->n)
+    if (*(data->current) == data->theGraph->n)
     {
         *(data->status) = COMPLETED;
         *(data->animationActive) = false;
@@ -654,20 +703,22 @@ void *bfsThread(void *arg)
 
     delay(2);
 
-    data->visited[u] = true;
+    data->visited[*(data->current)] = true;
     // printf("%s ", data->theGraph->labels[u]);
-    data->queue[(*(data->qRear))++] = u;
+    data->queue[(*(data->qRear))++] = *(data->current);
 
     delay(1);
 
     while (*(data->qFront) < *(data->qRear)) {
-        u = data->queue[(*(data->qFront))++];
+        *(data->current) = data->queue[(*(data->qFront))++];
+        *(data->childrenTop) = 0;
 
         for (int v = 0; v < data->theGraph->n; v++)
-            if (data->theGraph->adj[u][v] && !data->visited[v]) {
+            if (data->theGraph->adj[*(data->current)][v] && !data->visited[v]) {
                 data->visited[v] = true;
                 // printf("%s ", data->theGraph->labels[v]);
                 data->queue[(*(data->qRear))++] = v;
+                data->children[(*(data->childrenTop))++] = v;
             }
 
         delay(1);
@@ -691,12 +742,11 @@ void *dfsThread(void *arg)
     for (int i = 0; i < data->theGraph->n; i++)
         data->visited[i] = false;
 
-    int u;
-    for (u = 0; u < data->theGraph->n; u++)
-        if (strcmp(data->theGraph->labels[u], data->startLabel) == 0)
+    for (*(data->current) = 0; *(data->current) < data->theGraph->n; (*(data->current))++)
+        if (strcmp(data->theGraph->labels[*(data->current)], data->startLabel) == 0)
             break;
 
-    if (u == data->theGraph->n)
+    if (*(data->current) == data->theGraph->n)
     {
         *(data->status) = COMPLETED;
         *(data->animationActive) = false;
@@ -707,20 +757,22 @@ void *dfsThread(void *arg)
 
     delay(2);
 
-    data->visited[u] = true;
-    data->stack[(*(data->sTop))++] = u;
+    data->visited[*(data->current)] = true;
+    data->stack[(*(data->sTop))++] = *(data->current);
 
     delay(1);
 
     while (*(data->sTop) > 0) {
-        u = data->stack[--(*(data->sTop))];
+        *(data->current) = data->stack[--(*(data->sTop))];
+        *(data->childrenTop) = 0;
         // printf("%s ", data->theGraph->labels[u]);
 
         for (int v = 0; v < data->theGraph->n; v++)
         {
-            if (data->theGraph->adj[u][v] && !data->visited[v]) {
-                data->visited[v] = 1;
+            if (data->theGraph->adj[*(data->current)][v] && !data->visited[v]) {
+                data->visited[v] = true;
                 data->stack[(*(data->sTop))++] = v;
+                data->children[(*(data->childrenTop))++] = v;
             }
         }
         delay(1);
