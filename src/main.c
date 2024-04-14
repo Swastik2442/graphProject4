@@ -105,6 +105,9 @@ typedef struct dijkstraThreadData
     int *distance;          // Distance Array
     int *previous;          // Previous Array
     priorityQueue *pQueue;  // Priority Queue
+    bool *visited;          // Visited Array
+    int *path;              // Path Array
+    int *pathHead;          // Path Head Index
     bool *animationActive;  // Animation Active Flag
 } dijkstraThreadData;
 
@@ -200,9 +203,9 @@ int main(void)
     }
     float edgeThickness = 4.0f;
     bool visitedVertices[MAX_POINTS];
-    int dsArray1[MAX_POINTS], dsArray2[MAX_POINTS], dsArray3[MAX_POINTS];
+    int dsArray1[MAX_POINTS], dsArray2[MAX_POINTS], dsArray3[MAX_POINTS], dsArray4[MAX_POINTS];
     priorityQueue pQueue;
-    int currentV, srcV, destV, childTop, qFront, qRear, stackTop;
+    int currentV, srcV, destV, childTop, qFront, qRear, stackTop, pathHead;
 
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
     char *bfsSourceLabel = (char *)RL_CALLOC(4096, 1);
@@ -242,7 +245,7 @@ int main(void)
     csvThreadData csvData = {&csvStatus, csvFilePath, points, &pointCount, &theGraph, bfsSourceLabel, dfsSourceLabel, dijkstraSourceLabel, bfsDestinationLabel, dfsDestinationLabel, dijkstraDestinationLabel};
     bfsThreadData bfsData = {&bfsStatus, &theGraph, bfsSourceLabel, bfsDestinationLabel, &currentV, &srcV, &destV, dsArray1, &childTop, visitedVertices, dsArray2, &qFront, &qRear, &bfsActive};
     dfsThreadData dfsData = {&dfsStatus, &theGraph, dfsSourceLabel, dfsDestinationLabel, &currentV, &srcV, &destV, dsArray1, &childTop, visitedVertices, dsArray2, &stackTop, &dfsActive};
-    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, dijkstraSourceLabel, dijkstraDestinationLabel, &currentV, &srcV, &destV, dsArray1, &childTop, dsArray2, dsArray3, &pQueue, &dijkstraActive};
+    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, dijkstraSourceLabel, dijkstraDestinationLabel, &currentV, &srcV, &destV, dsArray1, &childTop, dsArray2, dsArray3, &pQueue, visitedVertices, dsArray4, &pathHead, &dijkstraActive};
 
     // Set custom GUI Style
 
@@ -456,26 +459,6 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
     if (GuiButton((Rectangle){12, 48, 200, 24}, "Show Adjacency Matrix"))
         *adjacencyMatrixWindowActive = !(*adjacencyMatrixWindowActive);
 
-    // Draw Algorithm Buttons
-    if (GuiButton((Rectangle){144, bfsOffset, 200, 24}, "Breadth-First Search") && !(*(bfsData->animationActive)))
-    {
-        *(bfsData->animationActive) = true;
-        *(dfsData->animationActive) = false;
-        *(dijkstraData->animationActive) = false;
-    }
-    if (GuiButton((Rectangle){144, dfsOffset, 200, 24}, "Depth-First Search") && !(*(dfsData->animationActive)))
-    {
-        *(bfsData->animationActive) = false;
-        *(dfsData->animationActive) = true;
-        *(dijkstraData->animationActive) = false;
-    }
-    if (GuiButton((Rectangle){144, dijkstraOffset, 200, 24}, "Dijkstra's Algorithm") && !(*(dijkstraData->animationActive)))
-    {
-        *(bfsData->animationActive) = false;
-        *(dfsData->animationActive) = false;
-        *(dijkstraData->animationActive) = true;
-    }
-
     // Draw Algorithm Source Labels
     GuiTextBox((Rectangle){12, bfsOffset, 60, 24}, bfsData->sourceLabel, 4096, 
         (!(*(bfsData->animationActive)) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){12, bfsOffset, 60, 24})) ? true : false
@@ -497,6 +480,26 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
     GuiTextBox((Rectangle){78, dijkstraOffset, 60, 24}, dijkstraData->destinationLabel, 4096,
         (!(*(dijkstraData->animationActive)) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){78, dijkstraOffset, 60, 24})) ? true : false
     );
+
+    // Draw Algorithm Buttons
+    if (GuiButton((Rectangle){144, bfsOffset, 200, 24}, "Breadth-First Search") && !(*(bfsData->animationActive)))
+    {
+        *(bfsData->animationActive) = true;
+        *(dfsData->animationActive) = false;
+        *(dijkstraData->animationActive) = false;
+    }
+    if (GuiButton((Rectangle){144, dfsOffset, 200, 24}, "Depth-First Search") && !(*(dfsData->animationActive)))
+    {
+        *(bfsData->animationActive) = false;
+        *(dfsData->animationActive) = true;
+        *(dijkstraData->animationActive) = false;
+    }
+    if (GuiButton((Rectangle){144, dijkstraOffset, 200, 24}, "Dijkstra's Algorithm") && !(*(dijkstraData->animationActive)))
+    {
+        *(bfsData->animationActive) = false;
+        *(dfsData->animationActive) = false;
+        *(dijkstraData->animationActive) = true;
+    }
 
     // Draw Algorithm Results
     if (*(bfsData->animationActive) && !(*(dfsData->animationActive)) && !(*(dijkstraData->animationActive)) && *(bfsData->status) == IN_PROGRESS)
@@ -534,16 +537,18 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                 DrawRing(points[i], 24.0f, 26.0f, 0, 360, 90, BLACK);
         }
 
-        // Draw Current Vertex
-        DrawRing(points[*(bfsData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
-
         // Draw Queue Vertices
         for (int i = *(bfsData->qFront); i < *(bfsData->qRear); i++)
-            DrawRing(points[bfsData->queue[i]], 24.0f, 26.0f, 0, 360, 90, GREEN);
+            DrawRing(points[bfsData->queue[i]], 24.0f, 26.0f, 0, 360, 90, YELLOW);
 
         // Draw Children Vertices
         for (int i = 0; i < *(bfsData->childrenTop); i++)
             DrawRing(points[bfsData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
+
+        // Draw Current, Source and Destination Vertices
+        DrawRing(points[*(bfsData->current)], 24.0f, 26.0f, 0, 360, 90, ORANGE);
+        DrawRing(points[*(bfsData->src)], 24.0f, 26.0f, 0, 360, 90, RED);
+        DrawRing(points[*(bfsData->dest)], 24.0f, 26.0f, 0, 360, 90, GREEN);
     }
     else if (!(*(bfsData->animationActive)) && *(dfsData->animationActive) && !(*(dijkstraData->animationActive)) && *(dfsData->status) == IN_PROGRESS)
     {
@@ -579,16 +584,18 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                 DrawRing(points[i], 24.0f, 26.0f, 0, 360, 90, BLACK);
         }
 
-        // Draw Current Vertex
-        DrawRing(points[*(dfsData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
-
         // Draw Stack Vertices
         for (int i = 0; i < *(dfsData->sTop); i++)
-            DrawRing(points[dfsData->stack[i]], 24.0f, 26.0f, 0, 360, 90, GREEN);
+            DrawRing(points[dfsData->stack[i]], 24.0f, 26.0f, 0, 360, 90, YELLOW);
 
         // Draw Children Vertices
         for (int i = 0; i < *(dfsData->childrenTop); i++)
             DrawRing(points[dfsData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
+
+        // Draw Current, Source and Destination Vertices
+        DrawRing(points[*(bfsData->current)], 24.0f, 26.0f, 0, 360, 90, ORANGE);
+        DrawRing(points[*(bfsData->src)], 24.0f, 26.0f, 0, 360, 90, RED);
+        DrawRing(points[*(bfsData->dest)], 24.0f, 26.0f, 0, 360, 90, GREEN);
     }
     else if (!(*(bfsData->animationActive)) && !(*(dfsData->animationActive)) && *(dijkstraData->animationActive) && *(dijkstraData->status) == IN_PROGRESS)
     {
@@ -628,8 +635,8 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
                 // Draw Vertex's Parent // TODO: Refactor this to reduce Redundancy
                 if (dijkstraData->previous[i] != -1)
                 {
-                    DrawLineEx(points[dijkstraData->previous[i]], points[i], *edgeThickness, BLACK);
-                    drawArrow(points[dijkstraData->previous[i]], points[i], BLACK);
+                    DrawLineEx(points[dijkstraData->previous[i]], points[i], *edgeThickness, GRAY);
+                    drawArrow(points[dijkstraData->previous[i]], points[i], GRAY);
                     DrawCircleV(points[i], (*focusedPoint == i)? 30.0f : 24.0f, (*focusedPoint == i)? GRAY: LIGHTGRAY);
                     DrawText(TextFormat("%s", (*theGraph).labels[i]), points[i].x - 5, points[i].y - 5, 15, BLACK);
                     DrawCircleV(points[dijkstraData->previous[i]], (*focusedPoint == dijkstraData->previous[i])? 30.0f : 24.0f, (*focusedPoint == dijkstraData->previous[i])? GRAY: LIGHTGRAY);
@@ -638,16 +645,31 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
             }
         }
 
-        // Draw Current Vertex
-        DrawRing(points[*(dijkstraData->current)], 24.0f, 26.0f, 0, 360, 90, RED);
-
-        // Draw Queue Vertices
-        for (int i = 0; i < dijkstraData->pQueue->filled; i++)
-            DrawRing(points[dijkstraData->pQueue->heap[i].key], 24.0f, 26.0f, 0, 360, 90, GREEN);
-
         // Draw Children Vertices
         for (int i = 0; i < *(dijkstraData->childrenTop); i++)
             DrawRing(points[dijkstraData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
+
+        // Draw Current, Source and Destination Vertices
+        DrawRing(points[*(bfsData->current)], 24.0f, 26.0f, 0, 360, 90, ORANGE);
+        DrawRing(points[*(bfsData->src)], 24.0f, 26.0f, 0, 360, 90, RED);
+        DrawRing(points[*(bfsData->dest)], 24.0f, 26.0f, 0, 360, 90, GREEN);
+
+        // Draw Path // TODO: Refactor this to reduce Redundancy
+        if (*(dijkstraData->pathHead) != MAX_POINTS && dijkstraData->path[*(dijkstraData->pathHead)] == *(dijkstraData->src))
+        {
+            int parent, child;
+            for (int i = *(dijkstraData->pathHead); i < MAX_POINTS - 1; i++)
+            {
+                parent = dijkstraData->path[i];
+                child = dijkstraData->path[i + 1];
+                DrawLineEx(points[parent], points[child], *edgeThickness, BLACK);
+                drawArrow(points[parent], points[child], BLACK);
+                DrawCircleV(points[parent], (*focusedPoint == parent)? 30.0f : 24.0f, (*focusedPoint == parent)? GRAY: LIGHTGRAY);
+                DrawText(TextFormat("%s", (*theGraph).labels[parent]), points[parent].x - 5, points[parent].y - 5, 15, BLACK);
+            }
+            DrawCircleV(points[child], (*focusedPoint == child)? 30.0f : 24.0f, (*focusedPoint == child)? GRAY: LIGHTGRAY);
+            DrawText(TextFormat("%s", (*theGraph).labels[child]), points[child].x - 5, points[child].y - 5, 15, BLACK);
+        }
     }
 
     // Draw Adjacency Matrix Window
@@ -661,7 +683,10 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         {
             for (int j = 0; j < pointCount; j++)
             {
-                if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}))
+                if (
+                    CheckCollisionPointRec(GetMousePosition(), (Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}) &&
+                    !(*(bfsData->animationActive)) && !(*(dfsData->animationActive)) && !(*(dijkstraData->animationActive))
+                )
                 {
                     GuiValueBox((Rectangle){windowX + 40 + 50 * j, 72 + 50 * i, 40, 40}, "", &(*theGraph).adj[i][j], 0, INT_MAX, true);
                     DrawRing(points[i], 24.0f, 26.0f, 0, 360, 90, RED);
@@ -795,7 +820,6 @@ void *bfsThread(void *arg)
 
     // Algorithm Starts
     data->visited[*(data->current)] = true;
-    // printf("%s ", data->theGraph->labels[u]);
     data->queue[(*(data->qRear))++] = *(data->current);
 
     delay(1);
@@ -807,7 +831,8 @@ void *bfsThread(void *arg)
         for (int v = 0; v < data->theGraph->n; v++)
             if (data->theGraph->adj[*(data->current)][v] && !data->visited[v]) {
                 data->visited[v] = true;
-                // printf("%s ", data->theGraph->labels[v]);
+                if (v == *(data->dest))
+                    break;
                 data->queue[(*(data->qRear))++] = v;
                 data->children[(*(data->childrenTop))++] = v;
             }
@@ -868,12 +893,13 @@ void *dfsThread(void *arg)
     while (*(data->sTop) > 0) {
         *(data->current) = data->stack[--(*(data->sTop))];
         *(data->childrenTop) = 0;
-        // printf("%s ", data->theGraph->labels[u]);
 
         for (int v = 0; v < data->theGraph->n; v++)
         {
             if (data->theGraph->adj[*(data->current)][v] && !data->visited[v]) {
                 data->visited[v] = true;
+                if (v == *(data->dest))
+                    break;
                 data->stack[(*(data->sTop))++] = v;
                 data->children[(*(data->childrenTop))++] = v;
             }
@@ -920,11 +946,14 @@ void *dijkstraThread(void *arg)
 
     // Initialize all Variables
     pQueueInit(data->pQueue);
+    *(data->pathHead) = MAX_POINTS;
+
     data->distance[*(data->src)] = 0;
     data->previous[*(data->src)] = -1;
     pQueueInsert(data->pQueue, *(data->src), 0);
     for (int i = 0; i < data->theGraph->n; i++)
     {
+        data->visited[i] = false;
         if (i != *(data->src))
         {
             data->distance[i] = INT_MAX;
@@ -932,26 +961,48 @@ void *dijkstraThread(void *arg)
             pQueueInsert(data->pQueue, i, INT_MAX);
         }
     }
+    int distCheck;
 
     delay(2);
 
     // Algorithm Starts
+    // Search all Vertices for Shortest Path
     while (data->pQueue->filled > 0)
     {
         *(data->current) = pQueueExtractMin(data->pQueue);
+        data->visited[*(data->current)] = true;
         *(data->childrenTop) = 0;
 
         for (int v = 0; v < data->theGraph->n; v++)
-            if (data->theGraph->adj[*(data->current)][v] && data->distance[v] > data->distance[*(data->current)] + data->theGraph->adj[*(data->current)][v])
+        {
+            distCheck = data->distance[*(data->current)] + data->theGraph->adj[*(data->current)][v];
+            if (!data->visited[v] && data->theGraph->adj[*(data->current)][v] && data->distance[v] > distCheck)
             {
-                data->distance[v] = data->distance[*(data->current)] + data->theGraph->adj[*(data->current)][v];
+                data->distance[v] = distCheck;
                 data->previous[v] = *(data->current);
                 data->children[(*(data->childrenTop))++] = v;
                 pQueueDecreaseKey(data->pQueue, v, data->distance[v]);
             }
+        }
 
         delay(1);
     }
+
+    delay(1);
+
+    // Find Shortest Path
+    *(data->current) = *(data->dest);
+    data->path[--(*(data->pathHead))] = *(data->dest);
+    while (*(data->current) != *(data->src))
+    {
+        *(data->current) = data->previous[*(data->current)];
+        if (*(data->current) == -1)
+            break;
+
+        data->path[--(*(data->pathHead))] = *(data->current);
+    }
+
+    delay(3);
     // Algorithm Ends
 
     delay(2);

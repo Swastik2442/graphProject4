@@ -25,6 +25,6 @@ void bfs(Graph *g, int u, int visited[]);
 void depthFirstSearch(Graph *g, char *label);
 void dfs(Graph *g, int u, int visited[]);
 void dijkstra(Graph *g, char *label);
-void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDistance);
+void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDistance, int visited[]);
 
 #endif

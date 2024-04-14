@@ -184,24 +184,24 @@ void dijkstra(Graph *g, char *label)
     if (u == g->n)
         return;
     
-    int dist[MAX_VERTICES];
-    int prev[MAX_VERTICES];
+    int dist[MAX_VERTICES], prev[MAX_VERTICES], visited[MAX_VERTICES];
     priorityQueue verticesWithDistance;
     pQueueInit(&verticesWithDistance);
 
-    djk(g, u, dist, prev, &verticesWithDistance);
+    djk(g, u, dist, prev, &verticesWithDistance, visited);
 
     pQueueDeinit(&verticesWithDistance);
 }
 
 // Helper Function for Dijkstra's Algorithm
-void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDistance)
+void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDistance, int visited[])
 {
     dist[u] = 0;
     prev[u] = -1;
     pQueueInsert(verticesWithDistance, u, 0);
     for (int i = 0; i < g->n; i++)
     {
+        visited[i] = 0;
         if (i == u)
             continue;
         dist[i] = INT_MAX;
@@ -212,9 +212,10 @@ void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDis
     while (verticesWithDistance->filled > 0)
     {
         u = pQueueExtractMin(verticesWithDistance);
+        visited[u] = 1;
 
         for (int v = 0; v < g->n; v++)
-            if (g->adj[u][v] && dist[v] > dist[u] + g->adj[u][v])
+            if (!visited[v] && g->adj[u][v] && dist[v] > dist[u] + g->adj[u][v])
             {
                 dist[v] = dist[u] + g->adj[u][v];
                 prev[v] = u;
