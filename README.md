@@ -8,7 +8,7 @@ A Graph Visualization Application that is made as the Project of Group 4 in CS11
 4. Edit the Makefile(s) to suit your Development Setup.
 5. Build the Project using `make`.
 
-### Contributors
+### Team Members
 |Himanshu Bansal|Piyush Garg|Rahul Yadav|Rajat Paliwal|Saurabh Saini|Sourabh Yadav|Swastik Kulshreshtha|Utkarsh Tailor|Vinay Singh Shekhawat|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 |[@Himanshu26112002](https://github.com/Himanshu26112002)|[@piyushgarg5021](https://github.com/piyushgarg5021)|[@rahul240802](https://github.com/rahul240802)|[@Rajat0729](https://github.com/Rajat0729)|[@SaurabhSaini04](https://github.com/SaurabhSaini04)||[@Swastik2442](https://github.com/Swastik2442)|[@UtkarshTailor](https://github.com/UtkarshTailor)||

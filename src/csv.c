@@ -1,9 +1,9 @@
+#include "csv.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-
-#include "csv.h"
 
 // Read CSV File and store records in a 2D Array of Strings
 void readCSV(const char *filename, char *data[MAX_CSV_ROWS][MAX_CSV_COLS], int *rows, int *cols)

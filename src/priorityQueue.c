@@ -1,6 +1,6 @@
-#include <limits.h>
-
 #include "priorityQueue.h"
+
+#include <limits.h>
 
 // Return the Index of the Parent Node
 int _parent(int i)

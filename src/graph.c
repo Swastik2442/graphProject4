@@ -1,8 +1,8 @@
+#include "graph.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "graph.h"
 
 // Initialize a Graph with n vertices
 void graphInit(Graph *g, int n, char *labels[n])
