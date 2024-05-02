@@ -374,6 +374,8 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         *currentScene = START_MENU;
     if (GuiButton((Rectangle){48, 12, 24, 24}, "#75#"))
         createPointPolygon(points, pointCount, (Vector2){halfScreenWidth, halfScreenHeight}, polygonRadius);
+    if (GuiButton((Rectangle){84, 12, 128, 24}, "Randomize") && !(*(bfsData->animationActive)) && !(*(dfsData->animationActive)) && !(*(dijkstraData->animationActive)))
+        changeWeights(theGraph);
     if (GuiButton((Rectangle){12, 48, 200, 24}, "Show Adjacency Matrix"))
         *adjacencyMatrixWindowActive = !(*adjacencyMatrixWindowActive);
 
@@ -602,11 +604,12 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
         // Draw Path // TODO: Refactor this to reduce Redundancy
         if (*(dijkstraData->pathHead) != MAX_VERTICES && dijkstraData->path[*(dijkstraData->pathHead)] == *(dijkstraData->src))
         {
-            int parent, child;
+            int parent, child, pathLength = 0;
             for (int i = *(dijkstraData->pathHead); i < MAX_VERTICES - 1; i++)
             {
                 parent = dijkstraData->path[i];
                 child = dijkstraData->path[i + 1];
+                pathLength += (*theGraph).adj[parent][child];
                 DrawLineEx(points[parent], points[child], *edgeThickness, BLACK);
                 drawArrow(points[parent], points[child], BLACK);
                 DrawCircleV(points[parent], (*focusedPoint == parent)? 30.0f : 24.0f, (*focusedPoint == parent)? GRAY: LIGHTGRAY);
@@ -614,7 +617,10 @@ void mainScene(Vector2 *points, Graph *theGraph, int pointCount, int *focusedPoi
             }
             DrawCircleV(points[child], (*focusedPoint == child)? 30.0f : 24.0f, (*focusedPoint == child)? GRAY: LIGHTGRAY);
             DrawText(TextFormat("%s", (*theGraph).labels[child]), points[child].x - 5, points[child].y - 5, 15, BLACK);
+            GuiLabel((Rectangle){parentX, dsY + 24 * (pointCount + 2), 120, 24}, TextFormat("Path Length: %d", pathLength));
         }
+        else
+            GuiLabel((Rectangle){parentX, dsY + 24 * (pointCount + 2), 150, 24}, "No Path Found");
     }
 
     // Draw Adjacency Matrix Window

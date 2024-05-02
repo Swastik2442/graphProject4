@@ -20,7 +20,7 @@ void *csvThread(void *arg)
     readCSV(data->csvFilePath, csvData, &csvRows, &csvCols);
 
     csvN = (csvRows <= csvCols) ? csvRows : csvCols;
-    int adj[csvN][csvN];
+    int adj[csvN-1][csvN-1];
     for (int i = 1; i < csvN; i++)
         for (int j = 1; j < csvN; j++)
             adj[i-1][j-1] = strtol(csvData[i][j], NULL, 10);

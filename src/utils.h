@@ -3,6 +3,8 @@
 
 #include "raylib.h"
 
+#include "graph.h"
+
 void createPointPolygon(
     Vector2 *points, // Points Array
     int pointCount,  // Point Count
@@ -16,6 +18,9 @@ void drawArrow(
 );
 void delay(
     int intensity // Delay Intensity
+);
+void changeWeights(
+    Graph *graph // The Graph
 );
 
 #endif
