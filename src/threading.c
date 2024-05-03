@@ -71,7 +71,7 @@ void *dijkstraThread(void *arg)
     *(data->currentDest) = *(data->dest);
 
     // Start Travelling
-    while (*(data->currentSrc) != *(data->dest))
+    while (*(data->currentSrc) != *(data->dest) && *(data->travelledTop) < MAX_VERTICES)
     {
         // Initialize current Variables
         pQueueInit(data->pQueue);
@@ -93,7 +93,7 @@ void *dijkstraThread(void *arg)
         }
         int distCheck;
 
-        delay(2);
+        delay(1);
 
         // Algorithm Starts
         // Search all Vertices for Shortest Path
@@ -115,9 +115,11 @@ void *dijkstraThread(void *arg)
                 }
             }
 
-            delay(1);
+            // Uncomment to see internal process
+            // delay(1);
         }
 
+        pQueueDeinit(data->pQueue);
         delay(1);
 
         // Find Shortest Path
@@ -136,9 +138,6 @@ void *dijkstraThread(void *arg)
             delay(3);
         // Algorithm Ends
 
-        delay(2);
-        pQueueDeinit(data->pQueue);
-
         // Update Source and Destination Vertices
         data->travelled[(*(data->travelledTop))++] = *(data->currentSrc);
         *(data->currentSrc) = data->path[*(data->pathHead)+1];
@@ -146,6 +145,13 @@ void *dijkstraThread(void *arg)
         // Change Congestion
         randomWeights(data->theGraph);
     }
+
+    data->travelled[(*(data->travelledTop))++] = *(data->currentSrc);
+    // End Travelling
+
+    // Wait for Final Path Animation
+    *(data->hasTravelled) = true;
+    delay(8);
 
     *(data->status) = COMPLETED;
     *(data->animationActive) = false;

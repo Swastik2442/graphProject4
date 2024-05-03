@@ -20,7 +20,7 @@ const int halfScreenHeight = screenHeight / 2;
 
 // Constants
 
-const int polygonRadius = 200;
+const int polygonRadius = 250;
 const int dijkstraOffset = halfScreenHeight - 12;
 
 // Static Variables
@@ -99,6 +99,7 @@ int main(void)
     bool visitedVertices[MAX_VERTICES];
     int children[MAX_VERTICES], distance[MAX_VERTICES], previous[MAX_VERTICES], path[MAX_VERTICES], travelled[MAX_VERTICES];
     int srcV, destV, currentV, currentSrc, currentDest, childTop, pathHead, travelTop;
+    bool hasTravelled;
 
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
     char *srcLabel = (char *)RL_CALLOC(4096, 1);
@@ -126,7 +127,7 @@ int main(void)
     ThreadStatus dijkstraStatus = NOT_STARTED;
 
     csvThreadData csvData = {&csvStatus, csvFilePath, points, &pointCount, (Vector2){halfScreenWidth, halfScreenHeight}, polygonRadius, &theGraph, srcLabel, destLabel};
-    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, srcLabel, destLabel, &srcV, &destV, &currentV, &currentSrc, &currentDest, children, &childTop, distance, previous, &pQueue, visitedVertices, path, &pathHead, travelled, &travelTop, &dijkstraActive};
+    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, srcLabel, destLabel, &srcV, &destV, &currentV, &currentSrc, &currentDest, children, &childTop, distance, previous, &pQueue, visitedVertices, path, &pathHead, travelled, &travelTop, &hasTravelled, &dijkstraActive};
 
     // Set custom GUI Style
 
@@ -206,6 +207,7 @@ int main(void)
                 else if (dijkstraActive && dijkstraStatus != IN_PROGRESS)
                 {
                     randomWeights(&theGraph);
+                    hasTravelled = false;
                     dijkstraStatus = NOT_STARTED;
                     pthread_create(&dijkstraThreadID, NULL, dijkstraThread, (void *)&dijkstraData);
                 }
@@ -343,7 +345,7 @@ void mainScene(
         (!(*(dijkstraData->animationActive)) && CheckCollisionPointRec(GetMousePosition(), (Rectangle){78, dijkstraOffset, 60, 24})) ? true : false
     );
 
-    // Draw Algorithm Buttons
+    // Draw Algorithm Button
     if (GuiButton((Rectangle){144, dijkstraOffset, 200, 24}, "Dijkstra's Algorithm") && !(*(dijkstraData->animationActive)))
         *(dijkstraData->animationActive) = true;
 
@@ -353,86 +355,114 @@ void mainScene(
         // Draw Title
         DrawText("Dijkstra's Algorithm", dijkstraTitleOffset, 12, 18, BLACK);
 
-        // Position Calculation
-        int labelX = halfScreenWidth + halfScreenWidth / 2 - 24;
-        int parentX = labelX + 37;
-        int distanceX = parentX + 62;
-        int dsY = halfScreenHeight - 12 * pointCount;
-
-        // Draw Labels
-        GuiLabel((Rectangle){parentX - 13, dsY - 24, 50, 24}, "Parent");
-        GuiLabel((Rectangle){distanceX - 1, dsY - 24, 60, 24}, "Distance");
-
-        // Draw Text Structures
-        for (int i = 0; i < pointCount; i++)
+        // Draw Final Path or Not
+        if (*(dijkstraData->hasTravelled))
         {
-            int currY = dsY + 24 * i;
-
-            // Draw Parent Elements
-            GuiLabel((Rectangle){labelX, currY, 24, 24}, theGraph->labels[i]);
-            GuiTextBox((Rectangle){parentX, currY, 24, 24},
-                dijkstraData->previous[i] == -1 ? "" : theGraph->labels[dijkstraData->previous[i]],
-                0, false
-            );
-
-            // Draw Distance Elements
-            GuiTextBox((Rectangle){distanceX + 24, currY, 24, 24},
-                (dijkstraData->distance[i] != INT_MAX && dijkstraData->distance[i] != INT_MIN) ? (char*)TextFormat("%d", dijkstraData->distance[i]) : "#219#",
-                0, false
-            );
-
-            // Draw Vertex Distances
-            if (dijkstraData->distance[i] != INT_MAX && dijkstraData->distance[i] != INT_MIN)
+            // Draw Final Path // TODO: Refactor this to reduce Redundancy
+            if (*(dijkstraData->travelledTop) < MAX_VERTICES)
             {
-                DrawText(TextFormat("%d", dijkstraData->distance[i]), points[i].x + 24, points[i].y + 24, 12, BLACK);
-
-                // Draw Vertex's Parent // TODO: Refactor this to reduce Redundancy
-                if (dijkstraData->previous[i] != -1)
+                int parent, child;
+                for (int i = 0; i < *(dijkstraData->travelledTop) - 1; i++)
                 {
-                    DrawLineEx(points[dijkstraData->previous[i]], points[i], *edgeThickness, GRAY);
-                    drawArrow(points[dijkstraData->previous[i]], points[i], GRAY);
-                    DrawCircleV(points[i], (*focusedPoint == i)? 30.0f : 24.0f, (*focusedPoint == i)? GRAY: LIGHTGRAY);
-                    DrawText(TextFormat("%s", (*theGraph).labels[i]), points[i].x - 5, points[i].y - 5, 15, BLACK);
-                    DrawCircleV(points[dijkstraData->previous[i]], (*focusedPoint == dijkstraData->previous[i])? 30.0f : 24.0f, (*focusedPoint == dijkstraData->previous[i])? GRAY: LIGHTGRAY);
-                    DrawText(TextFormat("%s", (*theGraph).labels[dijkstraData->previous[i]]), points[dijkstraData->previous[i]].x - 5, points[dijkstraData->previous[i]].y - 5, 15, BLACK);
+                    parent = dijkstraData->travelled[i];
+                    child = dijkstraData->travelled[i + 1];
+                    DrawLineEx(points[parent], points[child], *edgeThickness, DARKBROWN);
+                    drawArrow(points[parent], points[child], DARKBROWN);
+                    DrawCircleV(points[parent], (*focusedPoint == parent)? 30.0f : 24.0f, (*focusedPoint == parent)? GRAY: LIGHTGRAY);
+                    DrawText(TextFormat("%s", (*theGraph).labels[parent]), points[parent].x - 5, points[parent].y - 5, 15, BLACK);
+                }
+                DrawCircleV(points[child], (*focusedPoint == child)? 30.0f : 24.0f, (*focusedPoint == child)? GRAY: LIGHTGRAY);
+                DrawText(TextFormat("%s", (*theGraph).labels[child]), points[child].x - 5, points[child].y - 5, 15, BLACK);
+                GuiLabel((Rectangle){dijkstraTitleOffset + 12, 36, 150, 24}, "Total Path Taken");
+            }
+            else
+                GuiLabel((Rectangle){dijkstraTitleOffset + 12, 36, 150, 24}, "No Path Found");
+        }
+        else
+        {
+            // Position Calculation
+            int labelX = halfScreenWidth + halfScreenWidth / 2 - 24;
+            int parentX = labelX + 37;
+            int distanceX = parentX + 62;
+            int dsY = halfScreenHeight - 12 * pointCount;
+
+            // Draw Labels
+            GuiLabel((Rectangle){parentX - 13, dsY - 24, 50, 24}, "Parent");
+            GuiLabel((Rectangle){distanceX - 1, dsY - 24, 60, 24}, "Distance");
+
+            // Draw Text Structures
+            for (int i = 0; i < pointCount; i++)
+            {
+                int currY = dsY + 24 * i;
+
+                // Draw Parent Elements
+                GuiLabel((Rectangle){labelX, currY, 24, 24}, theGraph->labels[i]);
+                GuiTextBox((Rectangle){parentX, currY, 24, 24},
+                    dijkstraData->previous[i] == -1 ? "" : theGraph->labels[dijkstraData->previous[i]],
+                    0, false
+                );
+
+                // Draw Distance Elements
+                GuiTextBox((Rectangle){distanceX + 24, currY, 24, 24},
+                    (dijkstraData->distance[i] != INT_MAX && dijkstraData->distance[i] != INT_MIN) ? (char*)TextFormat("%d", dijkstraData->distance[i]) : "#219#",
+                    0, false
+                );
+
+                // Draw Vertex Distances
+                if (dijkstraData->distance[i] != INT_MAX && dijkstraData->distance[i] != INT_MIN)
+                {
+                    DrawText(TextFormat("%d", dijkstraData->distance[i]), points[i].x + 24, points[i].y + 24, 12, BLACK);
+
+                    // Draw Vertex's Parent // TODO: Refactor this to reduce Redundancy
+                    if (dijkstraData->previous[i] != -1)
+                    {
+                        DrawLineEx(points[dijkstraData->previous[i]], points[i], *edgeThickness, GRAY);
+                        drawArrow(points[dijkstraData->previous[i]], points[i], GRAY);
+                        DrawCircleV(points[i], (*focusedPoint == i)? 30.0f : 24.0f, (*focusedPoint == i)? GRAY: LIGHTGRAY);
+                        DrawText(TextFormat("%s", (*theGraph).labels[i]), points[i].x - 5, points[i].y - 5, 15, BLACK);
+                        DrawCircleV(points[dijkstraData->previous[i]], (*focusedPoint == dijkstraData->previous[i])? 30.0f : 24.0f, (*focusedPoint == dijkstraData->previous[i])? GRAY: LIGHTGRAY);
+                        DrawText(TextFormat("%s", (*theGraph).labels[dijkstraData->previous[i]]), points[dijkstraData->previous[i]].x - 5, points[dijkstraData->previous[i]].y - 5, 15, BLACK);
+                    }
                 }
             }
+
+            // Draw Children Vertices
+            for (int i = 0; i < *(dijkstraData->childrenTop); i++)
+                DrawRing(points[dijkstraData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
+
+            // Draw Current Vertices
+            if (*(dijkstraData->current) != -1)
+                DrawRing(points[*(dijkstraData->current)], 24.0f, 26.0f, 0, 360, 90, ORANGE);
+            if (*(dijkstraData->currentSrc) != -1)
+                DrawRing(points[*(dijkstraData->currentSrc)], 24.0f, 26.0f, 0, 360, 90, PINK);
+
+            // Draw Path // TODO: Refactor this to reduce Redundancy
+            if (*(dijkstraData->pathHead) < MAX_VERTICES && dijkstraData->path[*(dijkstraData->pathHead)] == *(dijkstraData->currentSrc))
+            {
+                int parent, child, pathLength = 0;
+                for (int i = *(dijkstraData->pathHead); i < MAX_VERTICES - 1; i++)
+                {
+                    parent = dijkstraData->path[i];
+                    child = dijkstraData->path[i + 1];
+                    pathLength += (*theGraph).adj[parent][child] + (*theGraph).ext[parent][child];
+                    DrawLineEx(points[parent], points[child], *edgeThickness, BLACK);
+                    drawArrow(points[parent], points[child], BLACK);
+                    DrawCircleV(points[parent], (*focusedPoint == parent)? 30.0f : 24.0f, (*focusedPoint == parent)? GRAY: LIGHTGRAY);
+                    DrawText(TextFormat("%s", (*theGraph).labels[parent]), points[parent].x - 5, points[parent].y - 5, 15, BLACK);
+                }
+                DrawCircleV(points[child], (*focusedPoint == child)? 30.0f : 24.0f, (*focusedPoint == child)? GRAY: LIGHTGRAY);
+                DrawText(TextFormat("%s", (*theGraph).labels[child]), points[child].x - 5, points[child].y - 5, 15, BLACK);
+                GuiLabel((Rectangle){parentX, dsY + 24 * (pointCount + 2), 120, 24}, TextFormat("Path Length: %d", pathLength));
+            }
+            else
+                GuiLabel((Rectangle){parentX, dsY + 24 * (pointCount + 2), 150, 24}, "No Path Found");
         }
 
-        // Draw Children Vertices
-        for (int i = 0; i < *(dijkstraData->childrenTop); i++)
-            DrawRing(points[dijkstraData->children[i]], 24.0f, 26.0f, 0, 360, 90, BLUE);
-
-        // Draw Current, Source and Destination Vertices
-        if (*(dijkstraData->current) != -1)
-            DrawRing(points[*(dijkstraData->current)], 24.0f, 26.0f, 0, 360, 90, ORANGE);
-        if (*(dijkstraData->currentSrc) != -1)
-            DrawRing(points[*(dijkstraData->currentSrc)], 24.0f, 26.0f, 0, 360, 90, PINK);
+        // Draw Source and Destination Vertices
         if (*(dijkstraData->src) != -1)
             DrawRing(points[*(dijkstraData->src)], 24.0f, 26.0f, 0, 360, 90, RED);
         if (*(dijkstraData->dest) != -1)
             DrawRing(points[*(dijkstraData->dest)], 24.0f, 26.0f, 0, 360, 90, GREEN);
-
-        // Draw Path // TODO: Refactor this to reduce Redundancy
-        if (*(dijkstraData->pathHead) != MAX_VERTICES && dijkstraData->path[*(dijkstraData->pathHead)] == *(dijkstraData->currentSrc))
-        {
-            int parent, child, pathLength = 0;
-            for (int i = *(dijkstraData->pathHead); i < MAX_VERTICES - 1; i++)
-            {
-                parent = dijkstraData->path[i];
-                child = dijkstraData->path[i + 1];
-                pathLength += (*theGraph).adj[parent][child] + (*theGraph).ext[parent][child];
-                DrawLineEx(points[parent], points[child], *edgeThickness, BLACK);
-                drawArrow(points[parent], points[child], BLACK);
-                DrawCircleV(points[parent], (*focusedPoint == parent)? 30.0f : 24.0f, (*focusedPoint == parent)? GRAY: LIGHTGRAY);
-                DrawText(TextFormat("%s", (*theGraph).labels[parent]), points[parent].x - 5, points[parent].y - 5, 15, BLACK);
-            }
-            DrawCircleV(points[child], (*focusedPoint == child)? 30.0f : 24.0f, (*focusedPoint == child)? GRAY: LIGHTGRAY);
-            DrawText(TextFormat("%s", (*theGraph).labels[child]), points[child].x - 5, points[child].y - 5, 15, BLACK);
-            GuiLabel((Rectangle){parentX, dsY + 24 * (pointCount + 2), 120, 24}, TextFormat("Path Length: %d", pathLength));
-        }
-        else
-            GuiLabel((Rectangle){parentX, dsY + 24 * (pointCount + 2), 150, 24}, "No Path Found");
     }
 
     // Draw Adjacency Matrix Window

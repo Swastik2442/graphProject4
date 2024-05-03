@@ -51,6 +51,7 @@ typedef struct dijkstraThreadData
     int *pathHead;         // Path Head Index
     int *travelled;        // Travelled Array
     int *travelledTop;     // Travelled Top Index
+    bool *hasTravelled;    // Has Travelled Flag
     bool *animationActive; // Animation Active Flag
 } dijkstraThreadData;
 
