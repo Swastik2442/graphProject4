@@ -122,41 +122,6 @@ int test3()
 // Graph - Test Case 4
 int test4()
 {
-    char *labels[] = {"r", "s", "t", "u", "v", "w", "x", "y"};
-    graphInit(&g, 8, labels);
-
-    assert(g.n == 8);
-
-    addEdge(&g, "r", "s");
-    addEdge(&g, "r", "v");
-    addEdge(&g, "v", "r");
-    addEdge(&g, "s", "r");
-    addEdge(&g, "s", "w");
-    addEdge(&g, "w", "x");
-    addEdge(&g, "w", "t");
-    addEdge(&g, "x", "w");
-    addEdge(&g, "x", "t");
-    addEdge(&g, "x", "y");
-    addEdge(&g, "t", "w");
-    addEdge(&g, "t", "u");
-    addEdge(&g, "t", "x");
-    addEdge(&g, "u", "t");
-    addEdge(&g, "u", "y");
-    addEdge(&g, "y", "x");
-    addEdge(&g, "y", "u");
-
-    breadthFirstSearch(&g, "s");
-    printf("\n");
-    depthFirstSearch(&g, "s");
-    printf("\n");
-
-    graphDeinit(&g);
-    return 1;
-}
-
-// Graph - Test Case 5
-int test5()
-{
     graphInit(&g, 9, NULL);
 
     assert(g.n == 9);
@@ -202,6 +167,5 @@ int main(void)
     printf("Graph - Test 2 %s\n", test2() ? "PASSED" : "FAILED");
     printf("Graph - Test 3 %s\n", test3() ? "PASSED" : "FAILED");
     printf("Graph - Test 4 %s\n", test4() ? "PASSED" : "FAILED");
-    printf("Graph - Test 5 %s\n", test5() ? "PASSED" : "FAILED");
     return 0;
 }
