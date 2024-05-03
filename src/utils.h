@@ -19,8 +19,5 @@ void drawArrow(
 void delay(
     int intensity // Delay Intensity
 );
-void changeWeights(
-    Graph *graph // The Graph
-);
 
 #endif

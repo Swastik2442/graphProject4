@@ -45,7 +45,6 @@ void *dijkstraThread(void *arg)
     *(data->status) = IN_PROGRESS;
 
     // Search for Source and Destination Vertices
-    *(data->current) = -1;
     *(data->src) = -1;
     *(data->dest) = -1;
     for (int i = 0; i < data->theGraph->n; i++)
@@ -66,70 +65,87 @@ void *dijkstraThread(void *arg)
         return NULL;
     }
 
-    // Initialize all Variables
-    pQueueInit(data->pQueue);
-    *(data->pathHead) = MAX_VERTICES;
+    // Initialize Variables
+    *(data->travelledTop) = 0;
+    *(data->currentSrc) = *(data->src);
+    *(data->currentDest) = *(data->dest);
 
-    data->distance[*(data->src)] = 0;
-    data->previous[*(data->src)] = -1;
-    pQueueInsert(data->pQueue, *(data->src), 0);
-    for (int i = 0; i < data->theGraph->n; i++)
+    // Start Travelling
+    while (*(data->currentSrc) != *(data->dest))
     {
-        data->visited[i] = false;
-        if (i != *(data->src))
+        // Initialize current Variables
+        pQueueInit(data->pQueue);
+        *(data->pathHead) = MAX_VERTICES;
+        *(data->current) = -1;
+
+        data->distance[*(data->currentSrc)] = 0;
+        data->previous[*(data->currentSrc)] = -1;
+        pQueueInsert(data->pQueue, *(data->currentSrc), 0);
+        for (int i = 0; i < data->theGraph->n; i++)
         {
-            data->distance[i] = INT_MAX;
-            data->previous[i] = -1;
-            pQueueInsert(data->pQueue, i, INT_MAX);
-        }
-    }
-    int distCheck;
-
-    delay(2);
-
-    // Algorithm Starts
-    // Search all Vertices for Shortest Path
-    while (data->pQueue->filled > 0)
-    {
-        *(data->current) = pQueueExtractMin(data->pQueue);
-        data->visited[*(data->current)] = true;
-        *(data->childrenTop) = 0;
-
-        for (int v = 0; v < data->theGraph->n; v++)
-        {
-            distCheck = data->distance[*(data->current)] + data->theGraph->adj[*(data->current)][v];
-            if (!data->visited[v] && data->theGraph->adj[*(data->current)][v] && data->distance[v] > distCheck)
+            data->visited[i] = false;
+            if (i != *(data->currentSrc))
             {
-                data->distance[v] = distCheck;
-                data->previous[v] = *(data->current);
-                data->children[(*(data->childrenTop))++] = v;
-                pQueueDecreaseKey(data->pQueue, v, data->distance[v]);
+                data->distance[i] = INT_MAX;
+                data->previous[i] = -1;
+                pQueueInsert(data->pQueue, i, INT_MAX);
             }
+        }
+        int distCheck;
+
+        delay(2);
+
+        // Algorithm Starts
+        // Search all Vertices for Shortest Path
+        while (data->pQueue->filled > 0)
+        {
+            *(data->current) = pQueueExtractMin(data->pQueue);
+            data->visited[*(data->current)] = true;
+            *(data->childrenTop) = 0;
+
+            for (int v = 0; v < data->theGraph->n; v++)
+            {
+                distCheck = data->distance[*(data->current)] + data->theGraph->adj[*(data->current)][v] + data->theGraph->ext[*(data->current)][v];
+                if (!data->visited[v] && data->theGraph->adj[*(data->current)][v] && data->distance[v] > distCheck)
+                {
+                    data->distance[v] = distCheck;
+                    data->previous[v] = *(data->current);
+                    data->children[(*(data->childrenTop))++] = v;
+                    pQueueDecreaseKey(data->pQueue, v, data->distance[v]);
+                }
+            }
+
+            delay(1);
         }
 
         delay(1);
+
+        // Find Shortest Path
+        *(data->current) = *(data->currentDest);
+        data->path[--(*(data->pathHead))] = *(data->currentDest);
+        while (*(data->current) != *(data->currentSrc))
+        {
+            *(data->current) = data->previous[*(data->current)];
+            if (*(data->current) == -1)
+                break;
+
+            data->path[--(*(data->pathHead))] = *(data->current);
+        }
+
+        if (*(data->current) == *(data->currentSrc))
+            delay(3);
+        // Algorithm Ends
+
+        delay(2);
+        pQueueDeinit(data->pQueue);
+
+        // Update Source and Destination Vertices
+        data->travelled[(*(data->travelledTop))++] = *(data->currentSrc);
+        *(data->currentSrc) = data->path[*(data->pathHead)+1];
+
+        // Change Congestion
+        randomWeights(data->theGraph);
     }
-
-    delay(1);
-
-    // Find Shortest Path
-    *(data->current) = *(data->dest);
-    data->path[--(*(data->pathHead))] = *(data->dest);
-    while (*(data->current) != *(data->src))
-    {
-        *(data->current) = data->previous[*(data->current)];
-        if (*(data->current) == -1)
-            break;
-
-        data->path[--(*(data->pathHead))] = *(data->current);
-    }
-
-    if (*(data->current) == *(data->src))
-        delay(3);
-    // Algorithm Ends
-
-    delay(2);
-    pQueueDeinit(data->pQueue);
 
     *(data->status) = COMPLETED;
     *(data->animationActive) = false;

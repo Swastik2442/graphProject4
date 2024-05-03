@@ -13,8 +13,8 @@
 
 // Screen Size
 
-const int screenWidth = 1280;
-const int screenHeight = 720;
+const int screenWidth = 1440;
+const int screenHeight = 900;
 const int halfScreenWidth = screenWidth / 2;
 const int halfScreenHeight = screenHeight / 2;
 
@@ -97,8 +97,8 @@ int main(void)
     }
     priorityQueue pQueue;
     bool visitedVertices[MAX_VERTICES];
-    int dsArray1[MAX_VERTICES], dsArray2[MAX_VERTICES], dsArray3[MAX_VERTICES], dsArray4[MAX_VERTICES];
-    int currentV, srcV, destV, childTop, pathHead;
+    int children[MAX_VERTICES], distance[MAX_VERTICES], previous[MAX_VERTICES], path[MAX_VERTICES], travelled[MAX_VERTICES];
+    int srcV, destV, currentV, currentSrc, currentDest, childTop, pathHead, travelTop;
 
     char *csvFilePath = (char *)RL_CALLOC(4096, 1);
     char *srcLabel = (char *)RL_CALLOC(4096, 1);
@@ -126,7 +126,7 @@ int main(void)
     ThreadStatus dijkstraStatus = NOT_STARTED;
 
     csvThreadData csvData = {&csvStatus, csvFilePath, points, &pointCount, (Vector2){halfScreenWidth, halfScreenHeight}, polygonRadius, &theGraph, srcLabel, destLabel};
-    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, srcLabel, destLabel, &currentV, &srcV, &destV, dsArray1, &childTop, dsArray2, dsArray3, &pQueue, visitedVertices, dsArray4, &pathHead, &dijkstraActive};
+    dijkstraThreadData dijkstraData = {&dijkstraStatus, &theGraph, srcLabel, destLabel, &srcV, &destV, &currentV, &currentSrc, &currentDest, children, &childTop, distance, previous, &pQueue, visitedVertices, path, &pathHead, travelled, &travelTop, &dijkstraActive};
 
     // Set custom GUI Style
 
@@ -205,6 +205,7 @@ int main(void)
                     dijkstraActive = false;
                 else if (dijkstraActive && dijkstraStatus != IN_PROGRESS)
                 {
+                    randomWeights(&theGraph);
                     dijkstraStatus = NOT_STARTED;
                     pthread_create(&dijkstraThreadID, NULL, dijkstraThread, (void *)&dijkstraData);
                 }
@@ -310,7 +311,7 @@ void mainScene(
 
                 // Draw Edge Weights
                 Vector2 midPoint = {(points[i].x + points[j].x) / 2, (points[i].y + points[j].y) / 2};
-                DrawText(TextFormat("%d", (*theGraph).adj[i][j]), midPoint.x, midPoint.y + 20, 10, BLACK);
+                DrawText(TextFormat("%d + %d", (*theGraph).adj[i][j], (*theGraph).ext[i][j]), midPoint.x, midPoint.y + 20, 10, BLACK);
             }
         }
     }
@@ -327,8 +328,10 @@ void mainScene(
         *currentScene = START_MENU;
     if (GuiButton((Rectangle){48, 12, 24, 24}, "#75#"))
         createPointPolygon(points, pointCount, (Vector2){halfScreenWidth, halfScreenHeight}, polygonRadius);
-    if (GuiButton((Rectangle){84, 12, 128, 24}, "Randomize") && !(*(dijkstraData->animationActive)))
-        changeWeights(theGraph);
+    if (GuiButton((Rectangle){screenWidth - 239, 12, 100, 24}, "Randomize") && !(*(dijkstraData->animationActive)))
+        randomWeights(theGraph);
+    if (GuiButton((Rectangle){screenWidth - 127, 12, 100, 24}, "Reset") && !(*(dijkstraData->animationActive)))
+        resetWeights(theGraph);
     if (GuiButton((Rectangle){12, 48, 200, 24}, "Show Adjacency Matrix"))
         *adjacencyMatrixWindowActive = !(*adjacencyMatrixWindowActive);
 
@@ -403,20 +406,22 @@ void mainScene(
         // Draw Current, Source and Destination Vertices
         if (*(dijkstraData->current) != -1)
             DrawRing(points[*(dijkstraData->current)], 24.0f, 26.0f, 0, 360, 90, ORANGE);
+        if (*(dijkstraData->currentSrc) != -1)
+            DrawRing(points[*(dijkstraData->currentSrc)], 24.0f, 26.0f, 0, 360, 90, PINK);
         if (*(dijkstraData->src) != -1)
             DrawRing(points[*(dijkstraData->src)], 24.0f, 26.0f, 0, 360, 90, RED);
         if (*(dijkstraData->dest) != -1)
             DrawRing(points[*(dijkstraData->dest)], 24.0f, 26.0f, 0, 360, 90, GREEN);
 
         // Draw Path // TODO: Refactor this to reduce Redundancy
-        if (*(dijkstraData->pathHead) != MAX_VERTICES && dijkstraData->path[*(dijkstraData->pathHead)] == *(dijkstraData->src))
+        if (*(dijkstraData->pathHead) != MAX_VERTICES && dijkstraData->path[*(dijkstraData->pathHead)] == *(dijkstraData->currentSrc))
         {
             int parent, child, pathLength = 0;
             for (int i = *(dijkstraData->pathHead); i < MAX_VERTICES - 1; i++)
             {
                 parent = dijkstraData->path[i];
                 child = dijkstraData->path[i + 1];
-                pathLength += (*theGraph).adj[parent][child];
+                pathLength += (*theGraph).adj[parent][child] + (*theGraph).ext[parent][child];
                 DrawLineEx(points[parent], points[child], *edgeThickness, BLACK);
                 drawArrow(points[parent], points[child], BLACK);
                 DrawCircleV(points[parent], (*focusedPoint == parent)? 30.0f : 24.0f, (*focusedPoint == parent)? GRAY: LIGHTGRAY);

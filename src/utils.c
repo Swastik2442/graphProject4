@@ -1,8 +1,6 @@
 #include "utils.h"
 
-#include <stdlib.h>
 #include <math.h>
-#include <time.h>
 #include <unistd.h>
 
 // Create a Polygon of Points
@@ -36,29 +34,5 @@ void drawArrow(Vector2 pointA, Vector2 pointB, Color color)
 void delay(int intensity)
 {
     sleep(intensity);
-}
-//----------------------------------------------------------------------------------
-
-// Randomly Change the Weights of the Edges in a Graph
-//----------------------------------------------------------------------------------
-void changeWeights(Graph *graph) {
-    srand(time(NULL));
-    for (int i = 0; i < graph->n; i++)
-        for (int j = 0; j < graph->n; j++)
-        {
-            if (graph->adj[i][j] != 0)
-            {
-                if (rand() % 2)
-                {
-                    int newValue, change = (rand() % 9) + 1;
-                    if (rand() % 2)
-                        newValue = graph->adj[i][j] + change;
-                    else
-                        newValue = graph->adj[i][j] - change;
-
-                    graph->adj[i][j] = (newValue > 0) ? newValue : 0;
-                }
-            }
-        }
 }
 //----------------------------------------------------------------------------------

@@ -36,9 +36,11 @@ typedef struct dijkstraThreadData
     Graph *theGraph;       // Graph
     char *srcLabel;        // Source Label
     char *destLabel;       // Destination Label
-    int *current;          // Current Vertex
     int *src;              // Source Vertex
     int *dest;             // Destination Vertex
+    int *current;          // Current Vertex
+    int *currentSrc;       // Current Source Vertex
+    int *currentDest;      // Current Destination Vertex
     int *children;         // Children Array
     int *childrenTop;      // Children Top Index
     int *distance;         // Distance Array
@@ -47,6 +49,8 @@ typedef struct dijkstraThreadData
     bool *visited;         // Visited Array
     int *path;             // Path Array
     int *pathHead;         // Path Head Index
+    int *travelled;        // Travelled Array
+    int *travelledTop;     // Travelled Top Index
     bool *animationActive; // Animation Active Flag
 } dijkstraThreadData;
 

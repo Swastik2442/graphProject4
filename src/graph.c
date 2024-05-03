@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // Initialize a Graph with n vertices
 void graphInit(Graph *g, int n, char *labels[n])
@@ -27,7 +28,10 @@ void graphInit(Graph *g, int n, char *labels[n])
 
     for (int i = 0; i < MAX_VERTICES; i++)
         for (int j = 0; j < MAX_VERTICES; j++)
+        {
             g->adj[i][j] = 0;
+            g->ext[i][j] = 0;
+        }
 }
 
 // Deinitialize a Graph
@@ -87,6 +91,7 @@ int editEdge(Graph *g, char *labelU, char *labelV, int weight)
         return -1;
 
     g->adj[u][v] = weight;
+    g->ext[u][v] = 0;
 
     return 0;
 }
@@ -106,60 +111,39 @@ int editGraph(Graph *g, int n, char *labels[n], int newAdj[n][n])
     if (newAdj != NULL)
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++)
+            {
                 g->adj[i][j] = newAdj[i][j];
+                g->ext[i][j] = 0;
+            }
 
     return 0;
 }
 
-// Dijkstra's Algorithm
-void dijkstra(Graph *g, char *label)
-{
-    int u;
-    for (u = 0; u < g->n; u++)
-        if (strcmp(g->labels[u], label) == 0)
-            break;
-    if (u == g->n)
-        return;
-    
-    int dist[MAX_VERTICES], prev[MAX_VERTICES], visited[MAX_VERTICES];
-    priorityQueue verticesWithDistance;
-    pQueueInit(&verticesWithDistance);
-
-    djk(g, u, dist, prev, &verticesWithDistance, visited);
-
-    pQueueDeinit(&verticesWithDistance);
+// Reset the Extra Edge Weights in the Graph
+void resetWeights(Graph *g) {
+    for (int i = 0; i < g->n; i++)
+        for (int j = 0; j < g->n; j++)
+            g->ext[i][j] = 0;
 }
 
-// Helper Function for Dijkstra's Algorithm
-void djk(Graph *g, int u, int dist[], int prev[], priorityQueue *verticesWithDistance, int visited[])
-{
-    dist[u] = 0;
-    prev[u] = -1;
-    pQueueInsert(verticesWithDistance, u, 0);
+// Randomize the Extra Edge Weights in the Graph
+void randomWeights(Graph *g) {
+    srand(time(NULL));
     for (int i = 0; i < g->n; i++)
-    {
-        visited[i] = 0;
-        if (i == u)
-            continue;
-        dist[i] = INT_MAX;
-        prev[i] = -1;
-        pQueueInsert(verticesWithDistance, i, INT_MAX);
-    }
-
-    while (verticesWithDistance->filled > 0)
-    {
-        u = pQueueExtractMin(verticesWithDistance);
-        visited[u] = 1;
-
-        for (int v = 0; v < g->n; v++)
-            if (!visited[v] && g->adj[u][v] && dist[v] > dist[u] + g->adj[u][v])
+        for (int j = 0; j < g->n; j++)
+        {
+            if (g->adj[i][j] != 0)
             {
-                dist[v] = dist[u] + g->adj[u][v];
-                prev[v] = u;
-                pQueueDecreaseKey(verticesWithDistance, v, dist[v]);
-            }
-    }
+                if (rand() % 2)
+                {
+                    int newValue, change = (rand() % 9) + 1;
+                    if (rand() % 2)
+                        newValue = g->ext[i][j] + change;
+                    else
+                        newValue = g->ext[i][j] - change;
 
-    for (int i = 0; i < g->n; i++)
-        printf("%s <- %s: %d\n", g->labels[i], (prev[i] >= 0) ? g->labels[prev[i]] : g->labels[i], dist[i]);
+                    g->ext[i][j] = (newValue > 0) ? newValue : 0;
+                }
+            }
+        }
 }

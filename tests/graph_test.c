@@ -119,53 +119,10 @@ int test3()
     return 1;
 }
 
-// Graph - Test Case 4
-int test4()
-{
-    graphInit(&g, 9, NULL);
-
-    assert(g.n == 9);
-
-    editEdge(&g, "0", "1", 4);
-    editEdge(&g, "1", "0", 4);
-    editEdge(&g, "0", "7", 8);
-    editEdge(&g, "7", "0", 8);
-    editEdge(&g, "1", "2", 8);
-    editEdge(&g, "2", "1", 8);
-    editEdge(&g, "1", "7", 11);
-    editEdge(&g, "7", "1", 11);
-    editEdge(&g, "2", "3", 7);
-    editEdge(&g, "3", "2", 7);
-    editEdge(&g, "2", "5", 4);
-    editEdge(&g, "5", "2", 4);
-    editEdge(&g, "2", "8", 2);
-    editEdge(&g, "8", "2", 2);
-    editEdge(&g, "3", "4", 9);
-    editEdge(&g, "4", "3", 9);
-    editEdge(&g, "3", "5", 14);
-    editEdge(&g, "5", "3", 14);
-    editEdge(&g, "4", "5", 10);
-    editEdge(&g, "5", "4", 10);
-    editEdge(&g, "5", "6", 2);
-    editEdge(&g, "6", "5", 2);
-    editEdge(&g, "6", "7", 1);
-    editEdge(&g, "7", "6", 1);
-    editEdge(&g, "6", "8", 6);
-    editEdge(&g, "8", "6", 6);
-    editEdge(&g, "7", "8", 7);
-    editEdge(&g, "8", "7", 7);
-
-    dijkstra(&g, "0");
-
-    graphDeinit(&g);
-    return 1;
-}
-
 int main(void)
 {
     printf("Graph - Test 1 %s\n", test1() ? "PASSED" : "FAILED");
     printf("Graph - Test 2 %s\n", test2() ? "PASSED" : "FAILED");
     printf("Graph - Test 3 %s\n", test3() ? "PASSED" : "FAILED");
-    printf("Graph - Test 4 %s\n", test4() ? "PASSED" : "FAILED");
     return 0;
 }
